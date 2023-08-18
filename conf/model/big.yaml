@@ -1,0 +1,10 @@
+params:
+  batch_size: 16
+  dropout: 0.1
+  learning_rate: 5e-5
+  layer: 6
+  embedding_size: 512
+  neuron: 128
+  output_size: 64
+  nbrSerie: 100
+  lengthSerie: 130

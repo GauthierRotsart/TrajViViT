@@ -1,0 +1,10 @@
+defaults:
+  - model: small
+  - _self_
+
+seed: 1
+scene: "bookstore"
+video: 0
+device: 0
+
+
