@@ -59,7 +59,8 @@ def parse_args():
     parser.add_argument('--n_epoch', type=int, default=100, help='Number of epochs to train the model')
     parser.add_argument('--teacher_forcing', type=int, default=5, help='Number of epochs where teacher forcing is used')
     parser.add_argument('--name', type=str,default="",help="Name of the run on OneDB")
-    parser.add_argument('--dataset', type=str, default="all", help="Config name of the datasets to use")
+    #parser.add_argument('--dataset', type=str, default="all", help="Config name of the datasets to use")
+    parser.add_argument('--dataset', type=str, default="b0", help="Config name of the datasets to use")
     parser.add_argument('--scheduler', type=str, default="fixed", help="Config name of the datasets to use")
     args = parser.parse_args()
     return args
@@ -68,7 +69,6 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
-    print(args)
 
     batch_size = args.batch_size
     lr = args.lr
@@ -99,12 +99,16 @@ if __name__ == "__main__":
     size = f"{img_size}_{img_size}_{block_size}"
     folders = TrajDataset.conf_to_folders(data_config)
 
-    data_folders = ["/waldo/walban/student_datasets/arfranck/SDD/scenes/" + folder + size for folder in folders]
+    dataPath = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
+    data_folders = [dataPath + folder + size for folder in folders]
 
     props = [train_prop, val_prop, test_prop]
     train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0)
     val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1)
     test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2)
+    print("TRAIN", len(train_data))
+    print("VAL", len(val_data))
+    print("TEST", len(test_data))
 
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)

@@ -34,7 +34,7 @@ class TrajDataset(dataset.Dataset):
             raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
             print(len(raw_data["track_id"].unique()))
             all_ids = raw_data[raw_data['occluded'] != 1]["track_id"].unique()
-            rand.shuffle(all_ids)
+            #rand.shuffle(all_ids)
             split_index = (len(all_ids) * np.cumsum(prop)).astype(int)
             trajs_index = np.split(all_ids, split_index[:-1])[part]
             track_ids = raw_data["track_id"].unique()[trajs_index][:limit]
