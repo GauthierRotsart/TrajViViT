@@ -22,11 +22,12 @@ def main(cfg):
     dataPath = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
     scene = cfg.scene
     videoID = cfg.video
+    newSize = cfg.size
     videoPath = dataPath + scene + "/video" + str(videoID) + "/"
 
-    resize_bool = False #weither we want to resize the data
-    analyse_bool = True #weither we want to analyse the dataset
-    draw_bool = False #weither we want to draw black boxes on the frames
+    resize_bool = True #weither we want to resize the data
+    analyse_bool = False #weither we want to analyse the dataset
+    draw_bool = True #weither we want to draw black boxes on the frames
     print("scene: ", scene)
     print("video: ", videoID)
 
@@ -43,11 +44,8 @@ def main(cfg):
     print("number of data: ", nbrData)
     data = data[data.index % img_step == 0]
     if resize_bool:
-        new_size = (int(sys.argv[3]), int(sys.argv[3]))
-        box_size = int(sys.argv[4])
-        old_size = get_old_size(scene)
-
-        output_folder = f"{scene}/{new_size[0]}_{new_size[1]}_{box_size}"
+        new_size = (newSize, newSize)
+        output_folder = videoPath + "frames_" + str(new_size) + "_box_" + str(box_size) + "_step_" + str(img_step)
         if os.path.exists(output_folder + "/annotations_" + str(img_step) + ".txt"):
             print("already computed : " + output_folder + "/annotations_" + str(img_step))
             exit(0)

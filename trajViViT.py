@@ -4,13 +4,16 @@ from torch import nn
 import math
 from einops import rearrange
 from einops.layers.torch import Rearrange
-
-
+import torchvision
+import numpy as np
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 
 def posemb_sincos_3d(patches, temperature=10000, dtype=torch.float32):
+    print("cc0", *patches.shape)
+    print("cc1", patches.device)
+    print("cc2", patches.dtype)
     _, f, h, w, dim, device, dtype = *patches.shape, patches.device, patches.dtype
 
     z, y, x = torch.meshgrid(
@@ -68,51 +71,50 @@ class PositionalEncoding(nn.Module):
 
 class TrajViVit(nn.Module):
 
-    def __init__(self, *, image_size=(64, 64), image_patch_size=(16, 16), frames=8, frame_patch_size=1, dim, depth=6,
-                 heads=8, mlp_dim=1024, device, channels=1):
+    def __init__(self, *, dim, depth, heads, mlp_dim, channels, patch_size, nprev, device):
         super().__init__()
-
-        self.device = device
         self.dim = dim
-        self.nheads = heads
+        self.depth = depth
+        self.heads = heads
+        self.mlp_dim = mlp_dim
+        self.channels = channels
+        self.patch_size = patch_size
+        self.nprev = nprev
+        self.device = device
 
-        image_height, image_width = pair(image_size)
-        patch_height, patch_width = pair(image_patch_size)
+        self.conv1 = nn.Conv3d(in_channels=self.channels, out_channels=8, kernel_size=(self.nprev, 3, 3), stride=1,
+                               padding=1)
+        self.relu1 = nn.ReLU()
+        self.pool1 = nn.AdaptiveAvgPool3d((self.nprev, 64, 64))
 
-        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
-        assert frames % frame_patch_size == 0, f'Frames must be divisible by the frame patch size {frames} {frame_patch_size}'
+        self.conv2 = nn.Conv3d(in_channels=8, out_channels=16, kernel_size=(self.nprev, 3, 3), stride=1, padding=1)
+        self.relu2 = nn.ReLU()
+        self.pool2 = nn.AdaptiveAvgPool3d((self.nprev, 32, 32))
 
-        patch_dim = channels * patch_height * patch_width * frame_patch_size
+        self.conv3 = nn.Conv3d(in_channels=16, out_channels=32, kernel_size=(self.nprev, 3, 3), stride=1, padding=1)
+        self.relu3 = nn.ReLU()
+        self.pool3 = nn.AdaptiveAvgPool3d((self.nprev, 16, 16))
 
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b (f pf) (h p1) (w p2) -> b f h w (p1 p2 pf)', p1=patch_height, p2=patch_width,
-                      pf=frame_patch_size),
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, dim),
-            nn.LayerNorm(dim),
-        ).to(self.device)
+        self.pe = PositionalEncoding(self.dim)
 
-        self.pe = PositionalEncoding(dim).to(self.device)
+        self.encoderLayer = nn.TransformerEncoderLayer(d_model=self.dim, nhead=self.heads, dim_feedforward=self.mlp_dim,
+                                                       batch_first=True)
+        self.encoder = nn.TransformerEncoder(encoder_layer=self.encoderLayer, num_layers=self.depth)
+        self.decoderLayer = nn.TransformerDecoderLayer(d_model=self.dim, nhead=self.heads, batch_first=True)
+        self.decoder = nn.TransformerDecoder(decoder_layer=self.decoderLayer, num_layers=self.depth)
 
-        self.encoderLayer = nn.TransformerEncoderLayer(dim, nhead=heads, dim_feedforward=mlp_dim, batch_first=True).to(
-            self.device)
-        self.encoder = nn.TransformerEncoder(self.encoderLayer, num_layers=depth).to(self.device)
-
-        self.decoderLayer = nn.TransformerDecoderLayer(d_model=dim, nhead=heads, batch_first=True).to(self.device)
-        self.decoder = nn.TransformerDecoder(self.decoderLayer, depth).to(self.device)
-
-        self.coord_to_emb = nn.Linear(2, dim).to(device)
-        self.emb_to_coord = nn.Linear(dim, 2).to(self.device)
-
+        self.coord_to_emb = nn.Linear(2, dim)
+        self.emb_to_coord = nn.Linear(dim, 2)
     def forward(self, video, tgt, train=True):
-        *_, h, w, dtype = *video.shape, video.dtype
-        video = video.to(self.device)
-
-        x = self.to_patch_embedding(video)
-
-        pe = posemb_sincos_3d(x)
-        x = rearrange(x, 'b ... d -> b (...) d') + pe
-
+        b, f, h, w, dtype = *video.shape, video.dtype
+        video = torch.reshape(video, (b, 1, f, h, w))
+        out = self.pool1(self.relu1(self.conv1(video)))
+        out = self.pool2(self.relu2(self.conv2(out)))
+        x = self.pool3(self.relu3(self.conv3(out)))
+        pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
+        x = rearrange(x, 'b ... d -> b (...) d') #+ self.pe(x)#pe
+        print("x", x.shape)
+        x += self.pe(x)
         x = self.encoder(x)
 
         x = self.generate_sequence(tgt, x, train)
@@ -138,7 +140,7 @@ class TrajViVit(nn.Module):
         else:
             tgt = torch.ones(memory.shape[0], 2, self.dim).to(self.device)
 
-        mask = torch.ones((tgt.shape[0] * self.nheads, tgt.shape[1], tgt.shape[1])).to(self.device)
+        mask = torch.ones((tgt.shape[0] * self.heads, tgt.shape[1], tgt.shape[1])).to(self.device)
         mask = mask.masked_fill(torch.tril(torch.ones((tgt.shape[1], tgt.shape[1])).to(self.device)) == 0,
                                 float('-inf'))
         tgt = self.pe(tgt)

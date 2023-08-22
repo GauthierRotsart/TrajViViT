@@ -4,6 +4,7 @@ defaults:
 
 seed: 1
 scene: "bookstore"
+size: 224
 video: 0
 device: 0
 

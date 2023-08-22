@@ -20,7 +20,7 @@ class TrajDataset(dataset.Dataset):
         self.n_prev = n_prev
         self.n_next = n_next
         self.img_step = img_step
-        self.block_size = int(data_folders[0].split("_")[-1])
+        self.block_size = int(data_folders[0].split("_")[-3])
 
         self.path = path
 
@@ -120,6 +120,8 @@ class TrajDataset(dataset.Dataset):
             return ["deathCircle/video1/", "deathCircle/video3/", "nexus/video1/"]
         elif confname in ["b0", "bookstore0"]:
             return ["bookstore/video0/"]
+        elif confname in ["b1"]:
+            return ["bookstore/video1/"]
         elif confname == "every_biggest":
             folders = ["bookstore/video0/"]
             folders += ["coupa/video3/"]

@@ -7,7 +7,9 @@ from torch.nn import MSELoss
 from noam import NoamLR
 import torch
 import argparse
-
+import torchvision
+torch.cuda.empty_cache()
+torch.set_default_dtype(torch.float32)
 
 
 """
@@ -35,39 +37,47 @@ import argparse
         20) teacher_forcing
 """
 
+def to_device(data, device):
+    if isinstance(data, (list,tuple)):
+        return [to_device(x, device) for x in data]
+    return data.to(device, non_blocking=True)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Description of your program')
 
     parser.add_argument('--batch_size', type=int, default=10, help='Batch size for training')
     parser.add_argument('--lr', type=float, default=0.01, help='Learning rate for optimizer')
     parser.add_argument('--gpu', type=int, default=0, help='ID of the GPU to use')
-    parser.add_argument('--optimizer_name', type=str, default='Adam', help='Name of the optimizer')
+    parser.add_argument('--optimizer_name', type=str, default='adam', help='Name of the optimizer')
     parser.add_argument('--n_next', type=int, default=8, help='Number of next frames to predict')
-    parser.add_argument('--n_prev', type=int, default=8, help='Number of previous frames to use for prediction')
+    parser.add_argument('--n_prev', type=int, default=4, help='Number of previous frames to use for prediction')
     parser.add_argument('--train_prop', type=float, default=0.9, help='Proportion of data to use for training')
     parser.add_argument('--val_prop', type=float, default=0.05, help='Proportion of data to use for validation')
     parser.add_argument('--test_prop', type=float, default=0.05, help='Proportion of data to use for testing')
     parser.add_argument('--img_step', type=int, default=30, help='Frame step size')
-    parser.add_argument('--model_dimension', type=int, default=512, help='Dimension of the model')
-    parser.add_argument('--patch_size', type=int, default=8, help='Size of the patches')
+    parser.add_argument('--model_dimension', type=int, default=16, help='Dimension of the model')
+    parser.add_argument('--patch_size', type=int, default=16, help='Size of the patches')
     parser.add_argument('--img_size', type=int, default=64, help='Size of the input frames')
     parser.add_argument('--block_size', type=int, default=8, help='Size of the block in the frames')
     parser.add_argument('--patch_depth', type=int, default=2, help='Patch dept')
     parser.add_argument('--model_depth', type=int, default=6, help='Depth of the model')
-    parser.add_argument('--n_heads', type=int, default=8, help='Number of heads for the multi-head attention')
-    parser.add_argument('--mlp_dim', type=int, default=2048, help='Dimension of the MLP in the Transformer')
+    parser.add_argument('--n_heads', type=int, default=4, help='Number of heads for the multi-head attention')
+    parser.add_argument('--mlp_dim', type=int, default=512, help='Dimension of the MLP in the Transformer')
     parser.add_argument('--n_epoch', type=int, default=100, help='Number of epochs to train the model')
     parser.add_argument('--teacher_forcing', type=int, default=5, help='Number of epochs where teacher forcing is used')
     parser.add_argument('--name', type=str,default="",help="Name of the run on OneDB")
     #parser.add_argument('--dataset', type=str, default="all", help="Config name of the datasets to use")
-    parser.add_argument('--dataset', type=str, default="b0", help="Config name of the datasets to use")
+    parser.add_argument('--dataset', type=str, default="b1", help="Config name of the datasets to use")
     parser.add_argument('--scheduler', type=str, default="fixed", help="Config name of the datasets to use")
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
-
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    f = r - a  # free inside reserved
+    print("heeee", torch.cuda.mem_get_info()[0]/10**9)
     args = parse_args()
 
     batch_size = args.batch_size
@@ -100,7 +110,7 @@ if __name__ == "__main__":
     folders = TrajDataset.conf_to_folders(data_config)
 
     dataPath = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
-    data_folders = [dataPath + folder + size for folder in folders]
+    data_folders = [dataPath + "bookstore/video1/frames_(224, 224)_box_40_step_30/"]#[dataPath + folder + size for folder in folders]
 
     props = [train_prop, val_prop, test_prop]
     train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0)
@@ -114,9 +124,9 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
-    model = TrajViVit(image_size=img_size, image_patch_size=patch_size, frames=n_prev,
-                      frame_patch_size=patch_depth, dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim,
-                      device=device, heads=n_heads)
+    model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
+                      patch_size=patch_size, nprev=n_prev, device=device)
+    model = to_device(model, device)
 
     if optimizer_name == "adam":
         optimizer = Adam(model.parameters(), lr=lr)
