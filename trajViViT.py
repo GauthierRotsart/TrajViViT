@@ -3,17 +3,12 @@ import torch.nn.functional as F
 from torch import nn
 import math
 from einops import rearrange
-from einops.layers.torch import Rearrange
-import torchvision
-import numpy as np
+
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
 
 def posemb_sincos_3d(patches, temperature=10000, dtype=torch.float32):
-    print("cc0", *patches.shape)
-    print("cc1", patches.device)
-    print("cc2", patches.dtype)
     _, f, h, w, dim, device, dtype = *patches.shape, patches.device, patches.dtype
 
     z, y, x = torch.meshgrid(
@@ -113,7 +108,7 @@ class TrajViVit(nn.Module):
         x = self.pool3(self.relu3(self.conv3(out)))
         pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
         x = rearrange(x, 'b ... d -> b (...) d') #+ self.pe(x)#pe
-        print("x", x.shape)
+
         x += self.pe(x)
         x = self.encoder(x)
 

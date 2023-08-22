@@ -2,6 +2,8 @@ defaults:
   - model: small
   - _self_
 
+n_prev: 4
+n_next: 12
 seed: 1
 scene: "bookstore"
 size: 224

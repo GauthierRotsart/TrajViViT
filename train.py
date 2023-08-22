@@ -1,7 +1,8 @@
 import torch
-from datetime import datetime
 from noam import NoamLR
-
+import wandb
+import numpy as np
+from tqdm import tqdm
 
 """
     Train Loop to train the TrajViVit model
@@ -25,7 +26,7 @@ class Trainer:
         self.loss_evolution = []
         self.test_evolution = []
         self.validation_evolution = []
-        self.save_name = f"/waldo/walban/student_datasets/arfranck/model_saves/dim_{model.dim}_epochs_{epochs}_lr_{lr}-{datetime.now().strftime('%d-%m-%Y-%H:%M:%S')}.dict"
+        self.save_name = f"/waldo/walban/student_datasets/arfranck/model_saves/Test-b1.pt"
 
     def train(self):
 
@@ -36,48 +37,40 @@ class Trainer:
         update_step = -1
         for epoch in range(self.epochs):
             loss_evolution = []
-            print(f"Epoch {epoch}")
+
             model.train()
-            for step, train_batch in enumerate(self.train_data):
-                update_step += 1
+            with tqdm(total=self.epochs, unit="epoch", desc=f"Epoch {epoch}") as tepoch:
+                for step, train_batch in enumerate(self.train_data):
+                    update_step += 1
 
-                X_train = train_batch["src"].to(self.device)
-                Y_train = train_batch["tgt"].to(self.device)
+                    X_train = train_batch["src"].to(self.device)
+                    Y_train = train_batch["tgt"].to(self.device)
 
-                optimizer.zero_grad()
+                    optimizer.zero_grad()
 
-                if epoch < self.teacher_forcing:  # Teacher Forcing approach
+                    if epoch < self.teacher_forcing:  # Teacher Forcing approach
 
-                    pred = model(X_train, Y_train)
+                        pred = model(X_train, Y_train)
 
-                else:  # Autoregressive approach
-                    future = None
-                    n_next = Y_train.shape[1]
-                    for k in range(n_next):
-                        pred, future = model(X_train, future, train=False)
+                    else:  # Autoregressive approach
+                        future = None
+                        n_next = Y_train.shape[1]
+                        for k in range(n_next):
+                            pred, future = model(X_train, future, train=False)
 
-                loss = criterion(pred, Y_train)
+                    loss = criterion(pred, Y_train)
 
-                loss_evolution.append(loss.item())
-                loss.backward()
-                optimizer.step()
-                if isinstance(scheduler, NoamLR) == NoamLR:
+                    loss_evolution.append(loss.item())
+                    loss.backward()
+                    optimizer.step()
                     scheduler.step()
 
-            self.loss_evolution.append(loss_evolution)
-            if epoch % 10 == 0:
-                try:
-                    torch.save(model.state_dict(), self.save_name, _use_new_zipfile_serialization=False)
-                except:
-                    print("Could not save model")
-            self.validation(epoch)
-            scheduler.step()
+                    tepoch.set_postfix(loss=np.mean(loss.item()))
 
-        self.test()
-        try:
-            torch.save(model.state_dict(), self.save_name, _use_new_zipfile_serialization=False)
-        except:
-            print("Could not save model")
+                current_loss = self.validation(epoch)
+                wandb.log({"Training loss": np.mean(loss_evolution), "Epochs": epoch + 1})
+                wandb.log({"Validation loss": current_loss, "Epochs": epoch + 1})
+                tepoch.update(1)
 
     def validation(self, epoch):
 
@@ -99,7 +92,8 @@ class Trainer:
 
                 loss = criterion(pred, Y_val)
                 val_loss.append(loss)
-            self.validation_evolution.append(val_loss)
+
+        return np.mean(val_loss)
 
     def test(self):
 
