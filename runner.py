@@ -30,7 +30,6 @@ def to_device(data, device):
 def main(cfg):
     wandb.login()
     run = wandb.init(project="TrajViViT")
-    wandb.run.name = "Test-b1-100"
 
     wandb.config.update(cfg.model.params)
     print(cfg.model)
@@ -51,7 +50,16 @@ def main(cfg):
     model_depth = cfg.model.params.layer
     n_heads = cfg.model.params.MHA
     mlp_dim = cfg.model.params.mlp_dim
-    data_config = "b1" #a modifier en fonction de la scene
+    dropout = cfg.model.params.dropout
+    teacher_forcing = cfg.tf
+    scene = cfg.scene
+    video = "/video" + str(cfg.video)
+    box_size = cfg.box_size
+    img_size = cfg.size
+    pos_bool = cfg.pos
+    img_bool = cfg.img
+    multiCam = cfg.multiCam
+    app = cfg.app
 
     optimizer_name = 'adam'
     train_prop = 0.9
@@ -60,22 +68,83 @@ def main(cfg):
     img_step = 30
     patch_size = 16
     n_epoch = 100
-    teacher_forcing = 100
     scheduler_config = "fixed"
 
+    if len(multiCam) == 0:
+        if box_size == 0:
+            if pos_bool == True and img_bool == True:
+                if app:
+                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-app"
+                else:
+                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-drop"
+            elif pos_bool == False and img_bool == True:
+                wandb.run.name = scene + "_" + str(cfg.video) + "_Img"
+            elif pos_bool == True and img_bool == False:
+                wandb.run.name = scene + "_" + str(cfg.video) + "_Pos"
+            else:
+                raise NotImplementedError
+        else:
+            if pos_bool == True and img_bool == True:
+                wandb.run.name = scene + "_" + str(cfg.video) + "_box_" + str(box_size) + "_Img+Pos"
+            elif pos_bool == False and img_bool == True:
+                wandb.run.name = scene + "_" + str(cfg.video) + "_box_" + str(box_size) + "_Img"
+            elif pos_bool == True and img_bool == False:
+                wandb.run.name = scene + "_" + str(cfg.video) + "_box_" + str(box_size) + "_Pos"
+            else:
+                raise NotImplementedError
+    else:
+        scene_name = ""
+        for sc in multiCam:
+            scene_name += sc
 
-    #name = args.name if args.name != "" else f"{data_config} dim {model_dimension} mlp {mlp_dim} sched {scheduler_config}"
-
-    #size = f"{img_size}_{img_size}_{block_size}"
-    #folders = TrajDataset.conf_to_folders(data_config)
+        if box_size == 0:
+            if pos_bool == True and img_bool == True:
+                if app:
+                    wandb.run.name = scene_name + "_Img+Pos-app"
+                else:
+                    wandb.run.name = scene_name + "_Img+Pos"
+            elif pos_bool == False and img_bool == True:
+                wandb.run.name = scene_name + "_Img"
+            elif pos_bool == True and img_bool == False:
+                wandb.run.name = scene_name + "_Pos"
+            else:
+                raise NotImplementedError
+        else:
+            if pos_bool == True and img_bool == True:
+                wandb.run.name = scene_name + "_box_" + str(box_size) + "_Img+Pos"
+            elif pos_bool == False and img_bool == True:
+                wandb.run.name = scene_name + "_box_" + str(box_size) + "_Img"
+            elif pos_bool == True and img_bool == False:
+                wandb.run.name = scene_name + "_box_" + str(box_size) + "_Pos"
+            else:
+                raise NotImplementedError
 
     dataPath = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
-    data_folders = [dataPath + "bookstore/video1/frames_(224, 224)_box_40_step_30/"]#[dataPath + folder + size for folder in folders]
+    if len(multiCam) == 0:
+        if box_size != 0:
+            data_folders = [
+                dataPath + scene + video + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"]
+        else:
+            data_folders = [dataPath + scene + video + f"/frames_({img_size}, {img_size})_step_{img_step}/"]
+    else:
+        folders = TrajDataset.conf_to_folders(multiCam)
+        if box_size != 0:
+            data_folders = [dataPath + scenePath + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"
+                            for
+                            scenePath in folders]
+        else:
+            data_folders = [dataPath + scenePath + f"/frames_({img_size}, {img_size})_step_{img_step}/"
+                            for
+                            scenePath in folders]
+
 
     props = [train_prop, val_prop, test_prop]
-    train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0)
-    val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1)
-    test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2)
+    train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
+                             box_size=box_size)
+    val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1,
+                           box_size=box_size)
+    test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
+                            box_size=box_size)
     print("TRAIN", len(train_data))
     print("VAL", len(val_data))
     print("TEST", len(test_data))
@@ -85,7 +154,8 @@ def main(cfg):
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
     model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
-                      patch_size=patch_size, nprev=n_prev, device=device)
+                      patch_size=patch_size, nprev=n_prev, device=device, pos_bool=pos_bool, img_bool=img_bool,
+                      dropout=dropout, app=app)
     model = to_device(model, device)
 
     # Initialize parameters with Glorot / fan_avg.
@@ -144,6 +214,13 @@ def main(cfg):
         "epochs": n_epoch,
         "lr": lr,
         "teacher_forcing": teacher_forcing,
+        "box_size": box_size,
+        "scene": scene,
+        "video": str(cfg.video),
+        "pos_bool": pos_bool,
+        "img_bool": img_bool,
+        "app": app,
+        "multiCam": multiCam
     }
 
     trainer = Trainer(**configuration)

@@ -66,9 +66,16 @@ class PositionalEncoding(nn.Module):
 
 class TrajViVit(nn.Module):
 
-    def __init__(self, *, dim, depth, heads, mlp_dim, channels, patch_size, nprev, device):
+    def __init__(self, *, dim, depth, heads, mlp_dim, channels, patch_size, nprev, device, pos_bool, img_bool, dropout,
+                 app=False):
         super().__init__()
-        self.dim = dim
+
+        self.app = app
+        if self.app:
+            self.dim = dim*2
+        else:
+            self.dim = dim
+        self.dim_old = dim
         self.depth = depth
         self.heads = heads
         self.mlp_dim = mlp_dim
@@ -76,6 +83,12 @@ class TrajViVit(nn.Module):
         self.patch_size = patch_size
         self.nprev = nprev
         self.device = device
+        self.pos_bool = pos_bool
+        self.img_bool = img_bool
+        self.dropout_r = dropout
+
+        if self.dropout_r > 0:
+            self.dropout = nn.Dropout(self.dropout_r)
 
         self.conv1 = nn.Conv3d(in_channels=self.channels, out_channels=8, kernel_size=(self.nprev, 3, 3), stride=1,
                                padding=1)
@@ -93,21 +106,45 @@ class TrajViVit(nn.Module):
         self.pe = PositionalEncoding(self.dim)
 
         self.encoderLayer = nn.TransformerEncoderLayer(d_model=self.dim, nhead=self.heads, dim_feedforward=self.mlp_dim,
-                                                       batch_first=True)
+                                                       batch_first=True, dropout=self.dropout_r)
         self.encoder = nn.TransformerEncoder(encoder_layer=self.encoderLayer, num_layers=self.depth)
-        self.decoderLayer = nn.TransformerDecoderLayer(d_model=self.dim, nhead=self.heads, batch_first=True)
+        self.decoderLayer = nn.TransformerDecoderLayer(d_model=self.dim, nhead=self.heads, batch_first=True,
+                                                       dropout=self.dropout_r)
         self.decoder = nn.TransformerDecoder(decoder_layer=self.decoderLayer, num_layers=self.depth)
 
-        self.coord_to_emb = nn.Linear(2, dim)
-        self.emb_to_coord = nn.Linear(dim, 2)
-    def forward(self, video, tgt, train=True):
+        self.coord_to_emb = nn.Linear(2, self.dim)
+        self.emb_to_coord = nn.Linear(self.dim, 2)
+        self.src_to_emb = nn.Linear(self.nprev * 2, self.nprev * 32 * self.dim_old * self.dim_old)
+    def forward(self, video, tgt, src, train=True):
         b, f, h, w, dtype = *video.shape, video.dtype
         video = torch.reshape(video, (b, 1, f, h, w))
-        out = self.pool1(self.relu1(self.conv1(video)))
-        out = self.pool2(self.relu2(self.conv2(out)))
-        x = self.pool3(self.relu3(self.conv3(out)))
-        pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
-        x = rearrange(x, 'b ... d -> b (...) d') #+ self.pe(x)#pe
+        if self.img_bool:
+            out = self.pool1(self.relu1(self.conv1(video)))
+            out = self.pool2(self.relu2(self.conv2(out)))
+            x = self.pool3(self.relu3(self.conv3(out)))
+            pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
+            x_img = rearrange(x, 'b ... d -> b (...) d') #+ self.pe(x)#pe
+
+        if self.pos_bool:
+            src = src.contiguous().view(b, -1)
+            if self.dropout_r > 0:
+                src = self.dropout(self.src_to_emb(src))
+                x_src = src.contiguous().view(b, -1, self.dim_old)
+            else:
+                src = self.src_to_emb(src)
+                x_src = src.contiguous().view(b, -1, self.dim_old)
+
+        if self.img_bool == True and self.pos_bool == True:
+            if self.app:
+                x = torch.cat((x_img,x_src),2)#x_img + x_src
+            else:
+                x = x_img + x_src
+        elif self.img_bool == True and self.pos_bool == False:
+            x = x_img
+        elif self.img_bool == False and self.pos_bool == True:
+            x = x_src
+        else:
+            raise NotImplementedError
 
         x += self.pe(x)
         x = self.encoder(x)

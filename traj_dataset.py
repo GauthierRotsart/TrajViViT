@@ -14,13 +14,17 @@ from PIL import Image
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
-    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part=0, limit=None, path=False):
+    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part=0, limit=None, path=False, box_size=0):
 
         self.data_folders = data_folders
         self.n_prev = n_prev
         self.n_next = n_next
         self.img_step = img_step
-        self.block_size = int(data_folders[0].split("_")[-3])
+        self.box_size = box_size
+        if self.box_size == 0:
+            self.block_size = "Variable"
+        else:
+            self.block_size = int(data_folders[0].split("_")[-3])
 
         self.path = path
 
@@ -107,57 +111,28 @@ class TrajDataset(dataset.Dataset):
 
     @classmethod
     def conf_to_folders(cls, confname):
+        folder_list = []
+        for cam in confname:
+            scene_letter = [*cam][0]
+            video_nb = [*cam][1]
 
-        if confname in ["biggest", "dc1", "deathcicle1"]:
-            return ["deathCircle/video1/"]
-        elif confname in ["sec_biggest", "dc3", "deathcicle3"]:
-            return ["deathCircle/video3/"]
-        elif confname in ["third_biggest", "n1", "nexus1"]:
-            return ["nexus/video1/"]
-        elif confname in ["dc0"]:
-            return ["deathCircle/video0/"]
-        elif confname in ["top_3"]:
-            return ["deathCircle/video1/", "deathCircle/video3/", "nexus/video1/"]
-        elif confname in ["b0", "bookstore0"]:
-            return ["bookstore/video0/"]
-        elif confname in ["b1"]:
-            return ["bookstore/video1/"]
-        elif confname == "every_biggest":
-            folders = ["bookstore/video0/"]
-            folders += ["coupa/video3/"]
-            folders += ["deathCircle/video1/"]
-            folders += ["gates/video3/"]
-            folders += ["hyang/video4/"]
-            folders += ["little/video3/"]
-            folders += ["nexus/video2/"]
-            folders += ["quad/video2/"]
-            return folders
-        elif confname == "gates_1":
-            folders = ["gates/video1/"]
-            return folders
-        elif confname == "all":
-            folders = [f"bookstore/video{k}/" for k in range(7)]
-            folders += [f"coupa/video{k}/" for k in range(4)]
-            folders += [f"deathCircle/video{k}/" for k in range(5)]
-            folders += [f"gates/video{k}/" for k in range(9)]
-            folders += [f"hyang/video{k}/" for k in range(15)]
-            folders += [f"little/video{k}/" for k in range(4)]
-            folders += [f"nexus/video{k}/" for k in range(12)]
-            folders += [f"quad/video{k}/" for k in range(4)]
-            return folders
-        elif confname == "DCS":
-            folders = [f"deathCircle/video{k}/" for k in range(4)]
-            return folders
-        elif confname == "all_except_0":
-            folders = [f"bookstore/video{k}/" for k in range(1, 7)]
-            folders += [f"coupa/video{k}/" for k in range(1, 4)]
-            folders += [f"deathCircle/video{k}/" for k in range(1, 5)]
-            folders += [f"gates/video{k}/" for k in range(2, 9)]
-            folders += [f"hyang/video{k}/" for k in range(1, 15)]
-            folders += [f"little/video{k}/" for k in range(1, 4)]
-            folders += [f"nexus/video{k}/" for k in [k for k in range(12) if k in [5, 6]]]
-            folders += [f"quad/video{k}/" for k in range(1, 4)]
-            return folders
+            if scene_letter == "b":
+                folder_list.append("bookstore/video" + video_nb)
+            elif scene_letter == "c":
+                folder_list.append("coupa/video" + video_nb)
+            elif scene_letter == "d":
+                folder_list.append("deathCircle/video" + video_nb)
+            elif scene_letter == "g":
+                folder_list.append("gates/video" + video_nb)
+            elif scene_letter == "h":
+                folder_list.append("hyang/video" + video_nb)
+            elif scene_letter == "l":
+                folder_list.append("little/video" + video_nb)
+            elif scene_letter == "n":
+                folder_list.append("nexus/video" + video_nb)
+            elif scene_letter == "q":
+                folder_list.append("quad/video" + video_nb)
+            else:
+                raise NotImplementedError
+        return folder_list
 
-        else:
-            raise Exception("Dataset config name not recognized")

@@ -23,10 +23,11 @@ def main(cfg):
     scene = cfg.scene
     videoID = cfg.video
     newSize = cfg.size
+    box_size = cfg.box_size
     videoPath = dataPath + scene + "/video" + str(videoID) + "/"
 
     resize_bool = True #weither we want to resize the data
-    analyse_bool = False #weither we want to analyse the dataset
+    analyse_bool = True #weither we want to analyse the dataset
     draw_bool = True #weither we want to draw black boxes on the frames
     print("scene: ", scene)
     print("video: ", videoID)
@@ -38,14 +39,17 @@ def main(cfg):
     old_size = get_old_size(videoPath)
     print("image shape ", old_size)
     img_step = 30 #int(sys.argv[2])
-    box_size = 40#int(sys.argv[4])
 
     nbrData = len(data)
     print("number of data: ", nbrData)
     data = data[data.index % img_step == 0]
     if resize_bool:
         new_size = (newSize, newSize)
-        output_folder = videoPath + "frames_" + str(new_size) + "_box_" + str(box_size) + "_step_" + str(img_step)
+        if box_size != 0:
+            output_folder = videoPath + "frames_" + str(new_size) + "_box_" + str(box_size) + "_step_" + str(img_step)
+        else:
+            output_folder = videoPath + "frames_" + str(new_size) + "_step_" + str(img_step)
+
         if os.path.exists(output_folder + "/annotations_" + str(img_step) + ".txt"):
             print("already computed : " + output_folder + "/annotations_" + str(img_step))
             exit(0)
@@ -58,12 +62,21 @@ def main(cfg):
         data["x"] = round(((data["xmax"] + data["xmin"]) / 2) / x_scale, 2)
         data["y"] = round(((data["ymax"] + data["ymin"]) / 2) / y_scale, 2)
 
-        data["xmin"] = round(data["x"] - (box_size/2)).astype(int)
-        data["xmax"] = round(data["xmin"] + (box_size-1)).astype(int)
-        data["ymin"] = round(data["y"] - (box_size/2)).astype(int)
-        data["ymax"] = round(data["ymin"] + (box_size-1)).astype(int)
+        if box_size != 0:
+            data["xmin"] = round(data["x"] - (box_size/2)).astype(int)
+            data["xmax"] = round(data["xmin"] + (box_size-1)).astype(int)
+            data["ymin"] = round(data["y"] - (box_size/2)).astype(int)
+            data["ymax"] = round(data["ymin"] + (box_size-1)).astype(int)
+        else:
+            data["xmin"] = round(data["xmin"] / x_scale).astype(int)
+            data["xmax"] = round(data["xmax"] / x_scale).astype(int)
+            data["ymin"] = round(data["ymin"] / y_scale).astype(int)
+            data["ymax"] = round(data["ymax"] / y_scale).astype(int)
     else:
-        output_folder = videoPath + "frames_box_" + str(box_size) + "_step_" + str(img_step)
+        if box_size != 0:
+            output_folder = videoPath + "frames_box_" + str(box_size) + "_step_" + str(img_step)
+        else:
+            output_folder = videoPath + "frames_step_" + str(img_step)
 
     try:
         os.mkdir(output_folder)
@@ -75,23 +88,6 @@ def main(cfg):
     nbrTracks = data.values[-1][0] + 1
     print("number of tracks: ", nbrTracks)
     print(" ")
-
-    if analyse_bool:
-        df = pd.DataFrame([[scene, videoID, nbrTracks, nbrData, old_size[0], old_size[1]]],
-                          columns=["Scene", "Video", "Tracks", "Data", "Image width", "Image height"])
-
-        if not os.path.exists(savingPath):
-            with pd.ExcelWriter(savingPath, mode='w') as writer:
-                df_init = pd.DataFrame([])
-                df_init.to_excel(writer)
-            with pd.ExcelWriter(savingPath, mode='w') as writer:
-                df.to_excel(writer, index=False)
-        else:
-            wb = load_workbook(savingPath)
-
-            sheet = wb.active
-            sheet.append([scene, videoID, nbrTracks, nbrData, old_size[0], old_size[1]])
-            wb.save(savingPath)
 
     if draw_bool:
         x_size = []
@@ -113,13 +109,35 @@ def main(cfg):
                 top = row.ymin
                 right = row.xmax
                 bottom = row.ymax
+                print(right, left)
+                print("t",right-left, bottom-top)
                 x_size.append(right-left)
                 y_size.append((bottom-top))
                 draw.rectangle((left, top, right, bottom), fill="black")
                 img.save(outname)
 
-        print(len(x_size))
-        print(np.mean(x_size), np.mean(y_size))
+        box_x = np.mean(x_size)
+        box_y = np.mean(y_size)
+    else:
+        box_x = 0
+        box_y = 0
+    if analyse_bool:
+        df = pd.DataFrame([[scene, videoID, nbrTracks, nbrData, old_size[0], old_size[1], box_x, box_y]],
+                          columns=["Scene", "Video", "Tracks", "Data", "Image width", "Image height", "box width",
+                                   "box height"])
+
+        if not os.path.exists(savingPath):
+            with pd.ExcelWriter(savingPath, mode='w') as writer:
+                df_init = pd.DataFrame([])
+                df_init.to_excel(writer)
+            with pd.ExcelWriter(savingPath, mode='w') as writer:
+                df.to_excel(writer, index=False)
+        else:
+            wb = load_workbook(savingPath)
+
+            sheet = wb.active
+            sheet.append([scene, videoID, nbrTracks, nbrData, old_size[0], old_size[1], box_x, box_y])
+            wb.save(savingPath)
 
 if __name__ == "__main__":
 	main()

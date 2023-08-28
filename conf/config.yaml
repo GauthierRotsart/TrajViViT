@@ -4,10 +4,18 @@ defaults:
 
 n_prev: 4
 n_next: 12
-seed: 1
-scene: "bookstore"
+tf: 100 #full teacher forcing by default
+
 size: 224
+scene: "bookstore"
 video: 0
+box_size: 0
+
+seed: 1
 device: 0
+pos: False
+img: False
+multiCam: []
+app: False
 
 

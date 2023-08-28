@@ -1,9 +1,8 @@
 params:
-  batch_size: 10
+  batch_size: 8
   learning_rate: 5e-5
   embedding_size: 16
   layer: 6
   MHA: 4
   mlp_dim: 512
-  dropout: 0.1 #QUID ??
-
+  dropout: 0.1
