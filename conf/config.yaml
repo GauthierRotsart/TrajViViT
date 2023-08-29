@@ -11,6 +11,7 @@ size: 224
 scene: "bookstore"
 video: 0
 box_size: 0
+img_step: 12 # 2.5 fps for the 8-12 protocol
 
 seed: 1
 device: 0

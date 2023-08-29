@@ -73,7 +73,7 @@ def main(cfg):
     train_prop = 0.9
     val_prop = 0.05
     test_prop = 0.05
-    img_step = 30
+    img_step = cfg.img_step
     n_epoch = 100
 
     # HYPER-PARAMETERS OF THE MODEL
