@@ -42,11 +42,11 @@ class Trainer:
                     if self.app:
                         self.name = scene + "_" + str(video) + "_Img+Pos-app.pt"
                     else:
-                        self.name = scene + "_" + str(video) + "_Img+Pos-drop.pt"
+                        self.name = scene + "_" + str(video) + "_Img+Pos-4.pt"
                 elif pos_bool == False and img_bool == True:
-                    self.name = scene + "_" + str(video) + "_Img.pt"
+                    self.name = scene + "_" + str(video) + "_Img-4.pt"
                 elif pos_bool == True and img_bool == False:
-                    self.name = scene + "_" + str(video) + "_Pos.pt"
+                    self.name = scene + "_" + str(video) + "_Pos-4.pt"
                 else:
                     raise NotImplementedError
             else:
@@ -118,7 +118,7 @@ class Trainer:
                         n_next = Y_train.shape[1]
                         for k in range(n_next):
                             print("cc")
-                            pred, future = model(X_train, future, src_coord, train=False)
+                            pred, future = model(video=X_train, tgt=future, src=src_coord, train=False)
 
                     loss = criterion(pred, Y_train)
 
@@ -157,7 +157,7 @@ class Trainer:
                 self.count += 1
 
     def validation(self, epoch):
-
+        print("Let s go !")
         with torch.no_grad():
 
             model = self.model
@@ -165,7 +165,7 @@ class Trainer:
             model.eval()
 
             val_loss = []
-            for val_batch in self.val_data:
+            for _, val_batch in enumerate(self.val_data):
 
                 X_val = val_batch["src"].to(self.device)
                 Y_val = val_batch["tgt"].to(self.device)
@@ -173,7 +173,7 @@ class Trainer:
 
                 future = None
                 for k in range(Y_val.shape[1]):
-                    pred, future = model(X_val, future, src_coord, train=False)
+                    pred, future = model(video=X_val, tgt=future, src=src_coord, train=False)
 
                 loss = criterion(pred, Y_val)
                 val_loss.append(loss.item())

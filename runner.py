@@ -14,9 +14,12 @@ import numpy as np
 
 
 
-def get_default_device(device):
+def get_default_device(device, multiGPU=False):
     if torch.cuda.is_available():
-        return torch.device('cuda:' + str(device))
+        if multiGPU:
+            return torch.device('cuda:' + str(list(device)[0]))
+        else:
+            return torch.device('cuda:' + str(device))
     else:
         return torch.device('cpu')
 
@@ -43,7 +46,10 @@ def main(cfg):
 
     batch_size = cfg.model.params.batch_size
     lr = cfg.model.params.learning_rate
-    device = get_default_device(cfg.device)
+    if isinstance(cfg.device, int):
+        device = get_default_device(cfg.device, multiGPU=False)
+    else:
+        device = get_default_device(cfg.device, multiGPU=True)
     n_prev = cfg.n_prev
     n_next = cfg.n_next
     model_dimension = cfg.model.params.embedding_size
@@ -74,13 +80,13 @@ def main(cfg):
         if box_size == 0:
             if pos_bool == True and img_bool == True:
                 if app:
-                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-app"
+                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-app" + str(n_next)
                 else:
-                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-drop"
+                    wandb.run.name = scene + "_" + str(cfg.video) + "_Img+Pos-" + str(n_next)
             elif pos_bool == False and img_bool == True:
-                wandb.run.name = scene + "_" + str(cfg.video) + "_Img"
+                wandb.run.name = scene + "_" + str(cfg.video) + "_Img" + str(n_next)
             elif pos_bool == True and img_bool == False:
-                wandb.run.name = scene + "_" + str(cfg.video) + "_Pos"
+                wandb.run.name = scene + "_" + str(cfg.video) + "_Pos" + str(n_next)
             else:
                 raise NotImplementedError
         else:
@@ -156,7 +162,12 @@ def main(cfg):
     model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
                       patch_size=patch_size, nprev=n_prev, device=device, pos_bool=pos_bool, img_bool=img_bool,
                       dropout=dropout, app=app)
-    model = to_device(model, device)
+
+    if isinstance(cfg.device, int):
+        model = to_device(model, device)
+    else:
+        model = nn.DataParallel(model, device_ids=cfg.device)
+        model = to_device(model, list(cfg.device)[0])
 
     # Initialize parameters with Glorot / fan_avg.
     # Les poids qui ont une dimension plus petite que 2 utilisent l initialisation par dÃ©faut de pytorch
@@ -191,7 +202,6 @@ def main(cfg):
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.90)
     elif scheduler_config == 'step_95':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.95)
-
     elif scheduler_config == 'noam':
         optimizer = Adam(model.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-9) 
         scheduler = NoamLR(optimizer, model_dimension, int(len(train_loader) * n_epoch * 0.05))

@@ -2,7 +2,7 @@ defaults:
   - model: small
   - _self_
 
-n_prev: 4
+n_prev: 8
 n_next: 12
 tf: 100 #full teacher forcing by default
 

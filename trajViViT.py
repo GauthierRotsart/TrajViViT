@@ -7,7 +7,7 @@ from einops import rearrange
 def pair(t):
     return t if isinstance(t, tuple) else (t, t)
 
-
+"""
 def posemb_sincos_3d(patches, temperature=10000, dtype=torch.float32):
     _, f, h, w, dim, device, dtype = *patches.shape, patches.device, patches.dtype
 
@@ -44,7 +44,7 @@ def posemb_sincos_3d(patches, temperature=10000, dtype=torch.float32):
         out = torch.matmul(attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
-
+"""
 class PositionalEncoding(nn.Module):
 
     def __init__(self, d_model, dropout=0.1, max_len=5000):
@@ -60,7 +60,8 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x = x + self.pe[:x.size(0), :]
+        #self.device = x.get_device()
+        x += self.pe[:x.size(0), :].to(x.get_device())
         return self.dropout(x)
 
 
@@ -122,7 +123,7 @@ class TrajViVit(nn.Module):
             out = self.pool1(self.relu1(self.conv1(video)))
             out = self.pool2(self.relu2(self.conv2(out)))
             x = self.pool3(self.relu3(self.conv3(out)))
-            pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
+            #pe = posemb_sincos_3d(x)#posemb_sincos_3d(xx)
             x_img = rearrange(x, 'b ... d -> b (...) d') #+ self.pe(x)#pe
 
         if self.pos_bool:
@@ -146,13 +147,13 @@ class TrajViVit(nn.Module):
         else:
             raise NotImplementedError
 
-        x += self.pe(x)
+        x = self.pe(x)
         x = self.encoder(x)
 
         x = self.generate_sequence(tgt, x, train)
-        output = x
+        output = x#.to(self.device)
 
-        x = self.emb_to_coord(x[:, :-1, :])
+        x = self.emb_to_coord(x[:, :-1, :])#.to(self.device)
 
         if train:
             return x
@@ -161,21 +162,24 @@ class TrajViVit(nn.Module):
 
     def generate_sequence(self, tgt, memory, train):
         # Initialize the decoder input with a special start-of-sequence token
-
         if tgt is not None:
-
+            #self.device = tgt.get_device()
             if train:
                 tgt = self.coord_to_emb(tgt)
-
-            sos = torch.ones(memory.shape[0], 1, self.dim).to(self.device)
+            #tgt = self.coord_to_emb(tgt)
+            sos = torch.ones(memory.shape[0], 1, self.dim).to(memory.get_device())
             tgt = torch.cat([sos, tgt], dim=1)
         else:
-            tgt = torch.ones(memory.shape[0], 2, self.dim).to(self.device)
-
-        mask = torch.ones((tgt.shape[0] * self.heads, tgt.shape[1], tgt.shape[1])).to(self.device)
-        mask = mask.masked_fill(torch.tril(torch.ones((tgt.shape[1], tgt.shape[1])).to(self.device)) == 0,
-                                float('-inf'))
+            tgt = torch.ones(memory.shape[0], 2, self.dim).to(memory.get_device())
+        #self.device = tgt.get_device()
+        #memory = memory.to(self.device)
+        mask = torch.ones((tgt.shape[0] * self.heads, tgt.shape[1], tgt.shape[1]))#.to(self.device)
+        #mask = mask.masked_fill(torch.tril(torch.ones((tgt.shape[1], tgt.shape[1])).to(self.device)) == 0,
+                               # float('-inf'))
+        mask = mask.masked_fill(torch.tril(torch.ones((tgt.shape[1], tgt.shape[1]))) == 0,
+                                float('-inf')).to(tgt.get_device())
         tgt = self.pe(tgt)
+        #print(tgt.get_device(), memory.get_device(), mask.get_device())
         output = self.decoder(tgt=tgt, memory=memory, tgt_mask=mask)
 
         return output
