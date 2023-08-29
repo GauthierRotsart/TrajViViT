@@ -5,6 +5,7 @@ defaults:
 n_prev: 8
 n_next: 12
 tf: 100 #full teacher forcing by default
+optimizer: "adam"
 
 size: 224
 scene: "bookstore"
@@ -15,7 +16,10 @@ seed: 1
 device: 0
 pos: False
 img: False
-multiCam: []
-app: False
+multi_cam: []
+
+save_run: True
+verbose: False
+
 
 

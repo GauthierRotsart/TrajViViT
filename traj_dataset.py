@@ -7,10 +7,7 @@ import random
 import numpy as np
 from PIL import Image
 
-"""
-    This file is used to generate the data to train, test and validate the TrajViVit model in a 
-    sliding window manner. 
-"""
+
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
@@ -50,16 +47,14 @@ class TrajDataset(dataset.Dataset):
                 for i in range(len(traj) - self.n_next - self.n_prev):
                     if path != False:
                         path.append(folder)
-                    # n_prev images used to predict
-                    x = self.get_n_images_after_i(folder, traj, self.n_prev, i, memo)
+
+                    x = self.get_n_images_after_i(folder, traj, self.n_prev, i, memo)  # n_prev images used to predict
                     src.append(x)
-                    # coords of the previous images
-                    c = traj.iloc[i: i + self.n_prev][["x", "y"]]
+                    c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
                     coords.append(Tensor(c.values))
-                    # images that should be predicted
                     y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
-                        ["x", "y"]]  # recuperer le grand truth à prédire
-                    tgt.append(Tensor(y.values))  # add to ground truth dataset
+                        ["x", "y"]]  # images that should be predicted
+                    tgt.append(Tensor(y.values))
         self.src = torch.stack(src, dim=0)
         self.coords = self.normalize_coords(torch.stack(coords, dim=0))
         self.tgt = self.normalize_coords(torch.stack(tgt, dim=0))
