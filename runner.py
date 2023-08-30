@@ -56,9 +56,10 @@ def main(cfg):
     # PARAMETERS OF THE TRAINING
     data_path = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
     saving_path = '/linux/grotsartdehe/TrajViViT-models/'
-    if not os.path.exists(saving_path):
-        os.umask(0)  # for the file permission
-        os.makedirs(saving_path)  # Create a new directory because it does not exist
+    if save_run:
+        if not os.path.exists(saving_path):
+            os.umask(0)  # for the file permission
+            os.makedirs(saving_path)  # Create a new directory because it does not exist
 
     n_prev = cfg.n_prev
     n_next = cfg.n_next

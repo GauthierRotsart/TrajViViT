@@ -1,7 +1,7 @@
 params:
   batch_size: 4
   learning_rate: 5e-5
-  embedding_size: 32
+  embedding_size: 16
   layer: 6
   MHA: 4
   mlp_dim: 512

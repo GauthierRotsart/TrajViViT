@@ -42,6 +42,8 @@ class TrajViVit(nn.Module):
         self.pos_bool = pos_bool
         self.img_bool = img_bool
         self.device = device
+        if self.pos_bool is True and self.img_bool is True:
+            self.dim *= 2
 
         if self.dropout_r > 0:
             self.dropout = nn.Dropout(self.dropout_r)
@@ -69,7 +71,10 @@ class TrajViVit(nn.Module):
 
         self.coord_to_emb = nn.Linear(2, self.dim)
         self.emb_to_coord = nn.Linear(self.dim, 2)
-        self.src_to_emb = nn.Linear(self.n_prev * 2, self.n_prev * 32 * self.dim * self.dim // 4)
+        if self.pos_bool is True and self.img_bool is True:
+            self.src_to_emb = nn.Linear(self.n_prev * 2, self.n_prev * 32 * self.dim * self.dim // 4)
+        else:
+            self.src_to_emb = nn.Linear(self.n_prev * 2, self.n_prev * 32 * self.dim * self.dim)
 
     def forward(self, video, tgt, src):
         b, f, h, w = video.shape
@@ -92,7 +97,7 @@ class TrajViVit(nn.Module):
             if self.pos_bool:
                 src = src.contiguous().view(b, -1)
                 src = self.src_to_emb(src)
-                x_src = src.contiguous().view(b, -1, self.dim // 2)
+                x_src = src.contiguous().view(b, -1, self.dim)
                 x = x_src
             else:
                 print("The input is at least the positions or the images.")
