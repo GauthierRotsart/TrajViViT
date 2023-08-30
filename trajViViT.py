@@ -24,7 +24,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        x += self.pe[:x.size(0), :].to(self.device)
+        x += self.pe[:x.size(0), :]#.to(self.device)
         return self.dropout(x)
 
 
@@ -79,6 +79,7 @@ class TrajViVit(nn.Module):
     def forward(self, video, tgt, src):
         b, f, h, w = video.shape
         video = torch.reshape(video, (b, 1, f, h, w))
+        self.device = video.get_device()  # to update the device in multi GPU mode
 
         if self.img_bool:
             out = self.pool1(self.relu1(self.conv1(video)))
