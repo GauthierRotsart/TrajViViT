@@ -24,6 +24,41 @@ For technical reasons, the image sizes were reduced, the frames were transformed
 - `README.md`: The current file, providing an overview of the project, its usage, and file descriptions.
 - `requirements.txt`: Contains the required python modules to run the project.
 
+## Environment creation
+
+In a terminal or in Anaconda prompt (windows), you can create the TrajViViT environment as follows:
+
+### Example
+```bash
+python data_creation.py scene=bookstore video=0
+```
+
+## Dataset creation
+
+By default, we sample the Standford Drone Dataset at 2.5 fps. This is most often used by others researchs. You only have to chose
+a scene name (coupa, bookstore, ...) and the video number (0,1,...). The default scene is bookstore and the default video is 0.
+
+### Example
+```bash
+python data_creation.py scene=bookstore video=0
+```
+
+If you want to create multiple datasets, you can do it as follows:
+
+### Example
+```bash
+python data_creation.py -m scene=bookstore,coupa video=0,1,2
+```
+
+If you want to sample the Standford Drone Dataset at another frequency, you can use the img_step argument. For example, the following
+command will sample at 1fps.
+
+### Example
+```bash
+python data_creation.py scene=bookstore video=0 img_step=30
+```
+
+
 ## Usage
 
 Prepare your dataset and images according to the data format specified in data_creation.py.
