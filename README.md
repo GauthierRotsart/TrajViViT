@@ -1,6 +1,5 @@
 # TrajViViT
 
-modif Dan
 TrajViViT: Trajectory forecasting with Video Vision Transformers on top-view image sequences
 
 Repository of the master's thesis of:\
@@ -28,6 +27,16 @@ For technical reasons, the image sizes were reduced, the frames were transformed
 ## Environment creation
 
 In a terminal or in Anaconda prompt (windows), you can create the TrajViViT environment as follows:
+For ubuntu 20: 
+```bash
+pip install -r requirements_20.txt
+```
+
+For ubuntu 22: 
+```bash
+pip install -r requirements_22.txt
+```
+
 
 ### Example
 ```bash
@@ -59,6 +68,57 @@ command will sample at 1fps.
 python data_creation.py scene=bookstore video=0 img_step=30
 ```
 
+## Training a model 
+By default, the training is done on the GPU 0. If you do not have a GPU, then the model will be trained on CPU. You can choose to use the
+position (pos=True) and/or the image (img=True) as inputs of the network. For example, to train a network on coupa 2 with only the position: 
+
+### Example
+```bash
+python runner.py scene=coupa video=2 pos=True 
+```
+
+If you want to train the same network on GPU2: 
+
+### Example
+```bash
+python runner.py scene=coupa video=2 pos=True device=2
+```
+
+Or in multiGPU: 
+
+### Example
+```bash
+python runner.py scene=coupa video=2 pos=True device=[0,1,2]
+```
+
+A final feature is the training on multi camera. To do that, you have to use the first letter of the scene and video number. So, you have
+to use : 
+b --> bookstore
+c --> coupa
+d --> deathCircle
+g --> gates
+h --> hyang
+l --> little
+n --> nexus
+q --> quad 
+
+For example, if you want to train a network with the position and image on bookstore 0 and coupa 2: 
+
+### Example
+```bash
+python runner.py pos=True img=True multi_cam=[b0,c2]
+```
+
+
+
+
+
+
+
+
+
+
+## DEPRICATED
 
 ## Usage
 
