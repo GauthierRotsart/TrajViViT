@@ -74,21 +74,21 @@ position (pos=True) and/or the image (img=True) as inputs of the network. For ex
 
 ### Example
 ```bash
-python runner.py scene=coupa video=2 pos=True 
+python data_path=/PATH/TO/DATA/ saving_path=/PATH/ runner.py scene=coupa video=2 pos=True 
 ```
 
 If you want to train the same network on GPU2: 
 
 ### Example
 ```bash
-python runner.py scene=coupa video=2 pos=True device=2
+python runner.py data_path=/PATH/TO/DATA/ saving_path=/PATH/ scene=coupa video=2 pos=True device=2
 ```
 
 Or in multiGPU: 
 
 ### Example
 ```bash
-python runner.py scene=coupa video=2 pos=True device=[0,1,2]
+python runner.py data_path=/PATH/TO/DATA/ saving_path=/PATH/ scene=coupa video=2 pos=True device=[0,1,2]
 ```
 
 A final feature is the training on multi camera. To do that, you have to use the first letter of the scene and video number. So, you have
@@ -106,7 +106,7 @@ For example, if you want to train a network with the position and image on books
 
 ### Example
 ```bash
-python runner.py pos=True img=True multi_cam=[b0,c2]
+python runner.py data_path=/PATH/TO/DATA/ saving_path=/PATH/ pos=True img=True multi_cam=[b0,c2]
 ```
 
 
