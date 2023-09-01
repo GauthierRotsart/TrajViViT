@@ -18,6 +18,7 @@ For technical reasons, the image sizes were reduced, the frames were transformed
 - `noam.py`: Implementation of the Noam learning rate scheduler.
 - `runner.py`: Script to open the data and call training process from CLI.
 - `train.py`: Script containing the training process of the trajViVit model.
+- `test.py`: Script containing the test process of the trajViVit model.
 - `traj_dataset.py`: Custom dataset class for loading trajectory and image data.
 - `traj_plotter.ipynb`: Jupyter notebook providing tools for visualizing and analyzing trajectory predictions.
 - `README.md`: The current file, providing an overview of the project, its usage, and file descriptions.
