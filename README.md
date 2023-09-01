@@ -1,5 +1,6 @@
 # TrajViViT
 
+modif Dan
 TrajViViT: Trajectory forecasting with Video Vision Transformers on top-view image sequences
 
 Repository of the master's thesis of:\
