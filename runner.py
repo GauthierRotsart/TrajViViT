@@ -39,8 +39,8 @@ def main(cfg):
         device = get_default_device(cfg.device, multi_gpu=True)
 
     # PARAMETERS OF THE TRAINING
-    data_path = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
-    saving_path = '/linux/grotsartdehe/TrajViViT-models/'
+    data_path = cfg.data_path
+    saving_path = cfg.saving_path + "TrajViViT-models/"
     if save_run:
         if not os.path.exists(saving_path):
             os.umask(0)  # for the file permission

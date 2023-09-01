@@ -14,8 +14,8 @@ def get_old_size(video_path):
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg):
-    saving_path = "/linux/grotsartdehe/SDD.xlsx"  # analyse dataset
-    data_path = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
+    saving_path = cfg.saving_path + "SDD.xlsx"  # analyse dataset
+    data_path = cfg.data_path
 
     scene = cfg.scene
     video_id = cfg.video

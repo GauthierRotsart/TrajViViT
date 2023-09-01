@@ -42,8 +42,8 @@ def test(model, test_loader, device):
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg):
-	data_path = "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
-	saving_path = "/linux/grotsartdehe/TrajViViT-models/"
+	data_path = cfg.data_path
+	saving_path = cfg.saving_path + "TrajViViT-models/"
 	if isinstance(cfg.device, int):
 		device = get_default_device(cfg.device, multi_gpu=False)
 	else:

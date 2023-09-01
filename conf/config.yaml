@@ -22,5 +22,9 @@ multi_cam: []
 save_run: True
 verbose: False
 
+data_path: "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
+saving_path: "/linux/grotsartdehe/"
+
+
 
 
