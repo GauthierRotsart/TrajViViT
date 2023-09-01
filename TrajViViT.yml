@@ -1,0 +1,4 @@
+name: /waldo/condaenv/TrajViViT
+channels:
+  - defaults
+prefix: /waldo/condaenv/TrajViViT
