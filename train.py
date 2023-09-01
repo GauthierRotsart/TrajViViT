@@ -2,55 +2,8 @@ import torch
 import wandb
 import numpy as np
 from tqdm import tqdm
+from utils import get_run_name
 
-
-def get_run_name(multi_cam, box_size, pos_bool, img_bool, scene, video_id):
-    if len(multi_cam) == 0:  # Training on a single camera
-        if box_size == 0:  # Training on the box given by an object detection algorithm
-            if pos_bool is True and img_bool is True:
-                return scene + "_" + str(video_id) + "_Img+Pos"
-            elif pos_bool is False and img_bool is True:
-                return scene + "_" + str(video_id) + "_Img"
-            elif pos_bool is True and img_bool is False:
-                return scene + "_" + str(video_id) + "_Pos"
-            else:
-                print("The input is at least the positions or the images.")
-                raise NotImplementedError
-        else:
-            if pos_bool is True and img_bool is True:
-                return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Img+Pos"
-            elif pos_bool is False and img_bool is True:
-                return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Img"
-            elif pos_bool is True and img_bool is False:
-                return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Pos"
-            else:
-                print("The input is at least the positions or the images.")
-                raise NotImplementedError
-    else:  # Training on multiple cameras
-        scene_name = ""
-        for sc in multi_cam:
-            scene_name += sc
-
-        if box_size == 0:
-            if pos_bool is True and img_bool is True:
-                return scene_name + "_Img+Pos"
-            elif pos_bool is False and img_bool is True:
-                return scene_name + "_Img"
-            elif pos_bool is True and img_bool is False:
-                return scene_name + "_Pos"
-            else:
-                print("The input is at least the positions or the images.")
-                raise NotImplementedError
-        else:
-            if pos_bool is True and img_bool is True:
-                return scene_name + "_box_" + str(box_size) + "_Img+Pos"
-            elif pos_bool is False and img_bool is True:
-                return scene_name + "_box_" + str(box_size) + "_Img"
-            elif pos_bool is True and img_bool is False:
-                return scene_name + "_box_" + str(box_size) + "_Pos"
-            else:
-                print("The input is at least the positions or the images.")
-                raise NotImplementedError
 
 class Trainer:
 
@@ -81,6 +34,7 @@ class Trainer:
                                  img_bool=self.img_bool, scene=self.scene, video_id=self.video) + '.pt'
         self.device = device
 
+    # TRAINING LOOP
     def train(self):
         last_loss = 300
         best_loss = 300
@@ -121,16 +75,24 @@ class Trainer:
                                                                                                  current_loss))
                 if current_loss < last_loss:
                     best_loss = current_loss
-                    if self.save_run:
-                        wandb.log({"Training loss": np.mean(train_loss), "Epochs": epoch + 1})
-                        wandb.log({"Validation loss": current_loss, "Epochs": epoch + 1})
-                        if self.verbose:
-                            print(f"Saving best model for epoch: {epoch + 1}\n")
 
-                        torch.save(self.model, self.saving_path + self.name)
+                    if self.save_run:
+                        if isinstance(self.model, torch.nn.DataParallel):
+                            torch.save(self.model.module.state_dict(), self.saving_path + self.name)
+                        else:
+                            model_parallel = torch.nn.DataParallel(self.model).to(self.device)
+                            torch.save(model_parallel.module.state_dict(), self.saving_path + self.name)
+
+                if self.save_run:
+                    wandb.log({"Training loss": np.mean(train_loss), "Epochs": epoch + 1})
+                    wandb.log({"Validation loss": current_loss, "Epochs": epoch + 1})
+                    if self.verbose:
+                        print(f"Saving best model for epoch: {epoch + 1}\n")
+
                 last_loss = best_loss
                 t_epoch.update(1)
 
+    # VALIDATION LOOP
     def validation(self):
         with torch.no_grad():
             self.model.eval()
@@ -150,20 +112,3 @@ class Trainer:
                 val_loss.append(loss.item())
         return np.mean(val_loss)
 
-    def test(self):
-        with torch.no_grad():
-            self.model.eval()
-            test_loss = []
-            for test_batch in self.test_data:
-
-                x_test = test_batch["src"].to(self.device)
-                y_test = test_batch["tgt"].to(self.device)
-                src_coord = test_batch["coords"].to(self.device)
-
-                future = None
-                for k in range(y_test.shape[1]):
-                    pred, future = self.model(x_test, future, src=src_coord)
-
-                loss = self.criterion(pred, y_test)
-                test_loss.append(loss.item())
-        return np.mean(test_loss)

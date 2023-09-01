@@ -1,4 +1,5 @@
-from train import Trainer, get_run_name
+from train import Trainer
+from utils import get_run_name, get_default_device, to_device, get_folders
 from trajViViT import TrajViVit
 from traj_dataset import TrajDataset
 from torch.utils.data import DataLoader
@@ -12,22 +13,6 @@ import hydra
 import random
 import numpy as np
 import os
-
-
-def get_default_device(device, multi_gpu=False):
-    if torch.cuda.is_available():
-        if multi_gpu:
-            return torch.device('cuda:' + str(list(device)[0]))
-        else:
-            return torch.device('cuda:' + str(device))
-    else:
-        return torch.device('cpu')
-
-
-def to_device(data, device):
-    if isinstance(data, (list, tuple)):
-        return [to_device(x, device) for x in data]
-    return data.to(device, non_blocking=True)
 
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
@@ -94,22 +79,8 @@ def main(cfg):
     if save_run:
         wandb.run.name = get_run_name(multi_cam=multi_cam, box_size=box_size, pos_bool=pos_bool, img_bool=img_bool,
                                       scene=scene, video_id=str(cfg.video))
-    if len(multi_cam) == 0:
-        if box_size != 0:
-            data_folders = [
-                data_path + scene + video + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"]
-        else:
-            data_folders = [data_path + scene + video + f"/frames_({img_size}, {img_size})_step_{img_step}/"]
-    else:
-        folders = TrajDataset.conf_to_folders(multi_cam)
-        if box_size != 0:
-            data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"
-                            for
-                            scenePath in folders]
-        else:
-            data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_step_{img_step}/"
-                            for
-                            scenePath in folders]
+    data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+                               data_path=data_path, scene=scene, video=video)
 
     props = [train_prop, val_prop, test_prop]
     train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
