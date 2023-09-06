@@ -11,61 +11,68 @@ from PIL import Image
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
-    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part=0, limit=None, path=False, box_size=0):
+    def __init__(self, n_prev, n_next, img_step, prop, verbose, folder, part, box_size, track_id=None):
 
-        self.data_folders = data_folders
+        self.folder = folder
         self.n_prev = n_prev
         self.n_next = n_next
         self.img_step = img_step
         self.box_size = box_size
+        self.verbose = verbose
         if self.box_size == 0:
             self.block_size = "Variable"
         else:
-            self.block_size = int(data_folders[0].split("_")[-3])
+            self.block_size = int(self.folder[0].split("_")[-3])
 
-        self.path = path
+        self.track_id = track_id
 
-        src = []
-        tgt = []
-        coords = []
-        path = [] if path else False
-
-        for folder in self.data_folders:
+        if self.track_id is None:
             rand = random.Random(42)
-            raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
-            print(len(raw_data["track_id"].unique()))
+            raw_data = pd.read_csv(self.folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
             all_ids = raw_data[raw_data['occluded'] != 1]["track_id"].unique()
             rand.shuffle(all_ids)
             split_index = (len(all_ids) * np.cumsum(prop)).astype(int)
             trajs_index = np.split(all_ids, split_index[:-1])[part]
-            track_ids = raw_data["track_id"].unique()[trajs_index][:limit]
+            track_ids = raw_data["track_id"].unique()[trajs_index]
+            self.track_ids = track_ids
+            self.raw_data = raw_data
+        else:
+            self.src, self.coords, self.tgt = self.get_track_data(track_id=self.track_id)
 
-            for track_id in track_ids:
-                print("opening track " + str(track_id) + " from " + folder)
-                traj = raw_data[raw_data["track_id"] == track_id]  # get all positions of track
-                memo = {}
-                for i in range(len(traj) - self.n_next - self.n_prev):
-                    if path != False:
-                        path.append(folder)
+    def get_track_ids(self):
+        return self.track_ids
 
-                    x = self.get_n_images_after_i(folder, traj, self.n_prev, i, memo)  # n_prev images used to predict
-                    src.append(x)
-                    c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
-                    coords.append(Tensor(c.values))
-                    y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
-                        ["x", "y"]]  # images that should be predicted
-                    tgt.append(Tensor(y.values))
-        self.src = torch.stack(src, dim=0)
+    def get_track_data(self, track_id):
+        self.track_id = track_id
+        if self.verbose:
+            print("opening track " + str(self.track_id) + " from " + self.folder)
+
+        traj = self.raw_data[self.raw_data["track_id"] == self.track_id]  # get all positions of track
+        memo = {}
+        src = []
+        tgt = []
+        coords = []
+
+        for i in range(len(traj) - self.n_next - self.n_prev):
+            x = self.get_n_images_after_i(self.folder, traj, self.n_prev, i, memo)  # n_prev images used to predict
+            src.append(x)
+            c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
+            coords.append(Tensor(c.values))
+            y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
+                ["x", "y"]]  # images that should be predicted
+            tgt.append(Tensor(y.values))
+
+        self.src = src  # torch.stack(src, dim=0)
         self.coords = self.normalize_coords(torch.stack(coords, dim=0))
         self.tgt = self.normalize_coords(torch.stack(tgt, dim=0))
-        self.path = path
+
+        return self.src, self.coords, self.tgt
 
     def normalize_coords(self, tgt):
-        print(self.get_image_size()[0])
         return tgt / self.get_image_size()[0]
 
     def get_n_images_after_i(self, folder, traj, n, i, memo):
-        X = []
+        x = []
         for ind, pos in traj.iloc[i: i + n, :].iterrows():
             track_id = pos["track_id"]
             frame = pos["frame"]
@@ -76,16 +83,11 @@ class TrajDataset(dataset.Dataset):
                 img = Image.open(f"{folder}/{track_id:03d}_{frame:05d}.jpg")
                 memo[path] = img
             img_tensor = self.to_tensor(img)
-            X.append(img_tensor)
-        return torch.cat(X)
+            x.append(img_tensor)
+        return torch.cat(x)
 
     def __getitem__(self, item):
         return {
-            'src': self.src[item],
-            'coords': self.coords[item],
-            'tgt': self.tgt[item],
-            'path': self.path[item]
-        } if self.path else {
             'src': self.src[item],
             'coords': self.coords[item],
             'tgt': self.tgt[item]
@@ -130,4 +132,3 @@ class TrajDataset(dataset.Dataset):
             else:
                 raise NotImplementedError
         return folder_list
-

@@ -1,11 +1,9 @@
 from train import Trainer
 from utils import get_run_name, get_default_device, to_device, get_folders
 from trajViViT import TrajViVit
-from traj_dataset import TrajDataset
-from torch.utils.data import DataLoader
 from torch.optim import *
 from torch.nn import MSELoss
-from noam import NoamLR
+
 import torch
 import torch.nn as nn
 import wandb
@@ -83,19 +81,6 @@ def main(cfg):
                                data_path=data_path, scene=scene, video=video)
 
     props = [train_prop, val_prop, test_prop]
-    train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
-                             box_size=box_size)
-    val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1,
-                           box_size=box_size)
-    test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
-                            box_size=box_size)
-    print("TRAIN", len(train_data))
-    print("VAL", len(val_data))
-    print("TEST", len(test_data))
-
-    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
     model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
                       dropout=dropout, n_prev=n_prev, pos_bool=pos_bool, img_bool=img_bool, device=device)
@@ -138,19 +123,12 @@ def main(cfg):
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=opt, step_size=1, gamma=0.90)
     elif scheduler_config == 'step_95':
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer=opt, step_size=1, gamma=0.95)
-    elif scheduler_config == 'noam':
-        opt = Adam(model.parameters(), lr=0.001, betas=(0.9, 0.98), eps=1e-9)
-        scheduler = NoamLR(optimizer=opt, model_dimension=model_dimension,
-                           warmup_steps=int(len(train_loader) * n_epoch * 0.05))
     else:
         print("Scheduler configuration not recognized.")
         raise NotImplementedError
 
     configuration = {
         "model": model,
-        "train_data": train_loader,
-        "test_data": test_loader,
-        "val_data": val_loader,
         "criterion": criterion,
         "optimizer": opt,
         "scheduler": scheduler,
@@ -164,13 +142,21 @@ def main(cfg):
         "multi_cam": multi_cam,
         "save_run": save_run,
         "saving_path": saving_path,
+        "data_folders": data_folders,
+        "n_prev": n_prev,
+        "n_next": n_next,
+        "img_step": img_step,
+        "prop": props,
+        "batch_size": batch_size,
+        "img_size": img_size,
         "verbose": verbose,
         "device": device
     }
 
     trainer = Trainer(**configuration)
     trainer.train()
-    run.finish()
+    if save_run:
+        run.finish()
 
 
 if __name__ == "__main__":

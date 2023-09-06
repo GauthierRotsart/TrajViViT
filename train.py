@@ -3,18 +3,17 @@ import wandb
 import numpy as np
 from tqdm import tqdm
 from utils import get_run_name
+from traj_dataset import TrajDataset
 
 
 class Trainer:
 
-    def __init__(self, model, train_data, test_data, val_data, criterion, optimizer, scheduler, epochs, teacher_forcing,
-                 box_size, scene, video, pos_bool, img_bool, multi_cam, save_run, saving_path, verbose, device):
+    def __init__(self, model, criterion, optimizer, scheduler, epochs, teacher_forcing, box_size, scene, video,
+                 pos_bool, img_bool, multi_cam, save_run, saving_path, data_folders, n_prev, n_next, img_step, prop,
+                 batch_size, img_size, verbose, device):
 
         self.model = model
-        self.train_data = train_data
-        self.test_data = test_data
-        self.val_data = val_data
-
+        self.data_folders = data_folders
         self.teacher_forcing = teacher_forcing
         self.criterion = criterion
         self.optimizer = optimizer
@@ -33,6 +32,25 @@ class Trainer:
         self.name = get_run_name(multi_cam=self.multi_cam, box_size=self.box_size, pos_bool=self.pos_bool,
                                  img_bool=self.img_bool, scene=self.scene, video_id=self.video) + '.pt'
         self.device = device
+        self.data_folders = data_folders
+        self.n_prev = n_prev
+        self.n_next = n_next
+        self.img_step = img_step
+        self.prop = prop
+        self.box_size = box_size
+        self.batch_size = batch_size
+        self.img_size = img_size
+
+    def create_batch(self, src, tgt, coords, start, stop):
+        batch_src = torch.zeros((self.batch_size, self.n_prev, self.img_size, self.img_size))
+        batch_tgt = torch.zeros((self.batch_size, self.n_next, 2))  # coord. in pixels
+        batch_coord = torch.zeros((self.batch_size, self.n_prev, 2))  # coord. in pixels
+        for i in range(self.batch_size):
+            batch_src[i, :, :, :] = src[start:stop][i]
+            batch_tgt[i, :, :] = tgt[start:stop][i]
+            batch_coord[i, :, :] = coords[start:stop][i]
+
+        return batch_src, batch_tgt, batch_coord
 
     # TRAINING LOOP
     def train(self):
@@ -43,30 +61,41 @@ class Trainer:
             for epoch in range(self.epochs):
                 train_loss = []
                 self.model.train()
-                for step, train_batch in enumerate(self.train_data):
+                for folder in self.data_folders:
+                    train_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step,
+                                             prop=self.prop, folder=folder, part=0, box_size=self.box_size,
+                                             verbose=self.verbose)
+                    track_ids = train_data.get_track_ids()
 
-                    x_train = train_batch["src"].to(self.device)
-                    y_train = train_batch["tgt"].to(self.device)
-                    src_coord = train_batch["coords"].to(self.device)
+                    for track_id in track_ids:
+                        src, coords, tgt = train_data.get_track_data(track_id=track_id)
+                        start = 0
+                        for stop in range(self.batch_size, len(src), self.batch_size):
+                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                  start=start, stop=stop)
+                            start = stop
 
-                    self.optimizer.zero_grad()
+                            x_train = batch_src.to(self.device)
+                            y_train = batch_tgt.to(self.device)
+                            src_coord = batch_coord.to(self.device)
+                            self.optimizer.zero_grad()
 
-                    if epoch < self.teacher_forcing:  # Teacher forcing approach
-                        pred, _ = self.model(x_train, y_train, src_coord)
-                    else:  # Autoregressive approach
-                        future = None
-                        n_next = y_train.shape[1]
-                        for k in range(n_next):
-                            pred, future = self.model(video=x_train, tgt=future, src=src_coord)
+                            if epoch < self.teacher_forcing:  # Teacher forcing approach
+                                pred, _ = self.model(x_train, y_train, src_coord)
+                            else:  # Autoregressive approach
+                                future = None
+                                n_next = y_train.shape[1]
+                                for k in range(n_next):
+                                    pred, future = self.model(video=x_train, tgt=future, src=src_coord)
 
-                    loss = self.criterion(pred, y_train)
+                            loss = self.criterion(pred, y_train)
 
-                    train_loss.append(loss.item())
-                    loss.backward()
-                    self.optimizer.step()
-                    self.scheduler.step()
+                            train_loss.append(loss.item())
+                            loss.backward()
+                            self.optimizer.step()
+                            self.scheduler.step()
 
-                    t_epoch.set_postfix(loss=np.mean(loss.item()))
+                            t_epoch.set_postfix(loss=np.mean(loss.item()))
 
                 current_loss = self.validation()
                 if self.verbose:
@@ -98,17 +127,27 @@ class Trainer:
             self.model.eval()
 
             val_loss = []
-            for _, val_batch in enumerate(self.val_data):
+            for folder in self.data_folders:
+                val_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step, prop=self.prop,
+                                       folder=folder, part=1, box_size=self.box_size, verbose=self.verbose)
+                track_ids = val_data.get_track_ids()
 
-                x_val = val_batch["src"].to(self.device)
-                y_val = val_batch["tgt"].to(self.device)
-                src_coord = val_batch["coords"].to(self.device)
+                for track_id in track_ids:
+                    src, coords, tgt = val_data.get_track_data(track_id=track_id)
+                    start = 0
+                    for stop in range(self.batch_size, len(src), self.batch_size):
+                        batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                              start=start, stop=stop)
+                        start = stop
 
-                future = None
-                for k in range(y_val.shape[1]):
-                    pred, future = self.model(video=x_val, tgt=future, src=src_coord)
+                        x_val = batch_src.to(self.device)
+                        y_val = batch_tgt.to(self.device)
+                        src_coord = batch_coord.to(self.device)
 
-                loss = self.criterion(pred, y_val)
-                val_loss.append(loss.item())
+                    future = None
+                    for k in range(y_val.shape[1]):
+                        pred, future = self.model(video=x_val, tgt=future, src=src_coord)
+
+                    loss = self.criterion(pred, y_val)
+                    val_loss.append(loss.item())
         return np.mean(val_loss)
-
