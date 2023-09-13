@@ -2,3 +2,6 @@
 multirun/*
 outputs/*
 wandb/*
+runs/*
+data/*
+yolov8n.pt
