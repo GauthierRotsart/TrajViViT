@@ -1,0 +1,5 @@
+names:
+  0: pedestrian
+path: "/home/dani/data/DroneDataset/nexus/video1/detection"
+train: train
+val: val

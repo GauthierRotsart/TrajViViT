@@ -1,0 +1,7 @@
+*__pycache__
+multirun/*
+outputs/*
+wandb/*
+runs/*
+data/*
+yolov8n.pt
