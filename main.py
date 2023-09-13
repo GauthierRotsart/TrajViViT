@@ -30,10 +30,10 @@ observation_matrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])  # H
 measurement_noise = np.eye(2) * k_v **2  # R
 #process_noise = np.eye(4) * (k_w ** 2)  # Q
 
-sigma_x = 0.1  # Variance of the positional noise in the x-direction
-sigma_y = 0.1  # Variance of the positional noise in the y-direction
-sigma_vx = 0.01  # Variance of the velocity noise in the x-direction
-sigma_vy = 0.01  # Variance of the velocity noise in the y-direction
+sigma_x = 1  # Variance of the positional noise in the x-direction
+sigma_y = 1  # Variance of the positional noise in the y-direction
+sigma_vx = 0.1  # Variance of the velocity noise in the x-direction
+sigma_vy = 0.1  # Variance of the velocity noise in the y-direction
 process_noise = np.array([
     [sigma_x ** 2, 0, 0, 0],
     [0, sigma_y ** 2, 0, 0],
@@ -55,41 +55,42 @@ def control_input(dt):
     G = np.array([[0], [0], [0], [0]])
     return G
 
-noise_variance=[0.1]
+noise_variance=[1]
 col_idx = np.array([0, 1])  # Replace with your actual column indices
 state_names = ['x', 'y']  # Replace with your actual state names
 final_results = []
 lfs=[]
-# for std_noise in noise_variance:
-#     #folder_path = "E:/data/TrajVivit"  # Replace with your actual folder path
-#     measurement_noise = np.eye(2) * std_noise **2  # R
-#     kf = KalmanFilter(initial_state=initial_state,
-#                       measurement_period=dt,
-#                       initial_covariance=initial_covariance,
-#                       process_noise=process_noise,
-#                       measurement_noise=measurement_noise,
-#                       state_transition_func=state_transition,
-#                       control_input_func=control_input,
-#                       observation_matrix=observation_matrix,
-#                       sensor_idx = str(std_noise))
+for std_noise in noise_variance:
+    #folder_path = "E:/data/TrajVivit"  # Replace with your actual folder path
+    measurement_noise = np.eye(2) * std_noise **2  # R
+    kf = KalmanFilter(initial_state=initial_state,
+                      measurement_period=dt,
+                      initial_covariance=initial_covariance,
+                      process_noise=process_noise,
+                      measurement_noise=measurement_noise,
+                      state_transition_func=state_transition,
+                      control_input_func=control_input,
+                      observation_matrix=observation_matrix,
+                      sensor_idx = str(std_noise))
     
-#     for i,positions in enumerate(traj_positions_list):
-#         reshaped_input_positions = [row.reshape(-1, 1) for row in positions.input_noisy_measures]
-#         reshaped_input_positions = np.array(reshaped_input_positions)
-#         runame="std="+str(std_noise)+"trj"+str(i)
-#         lkf_res = kf.run(reshaped_input_positions,runame=runame)
-#         results = calculate_errors(positions.ground_truth_forecast, [lkf_res], col_idx, state_names)
-#         lfs.append(lkf_res)
-#         final_results.extend(results)
-#     # Assuming y_true and other required variables are defined
+    for i,positions in enumerate(traj_positions_list):
+        reshaped_input_positions = [row.reshape(-1, 1) for row in positions.input_noisy_measures]
+        reshaped_input_positions = np.array(reshaped_input_positions)
+        runame="std="+str(std_noise)+"trj"+str(i)
+        lkf_res = kf.run(reshaped_input_positions,runame=runame)
+        results = calculate_errors(positions.ground_truth_forecast, [lkf_res], col_idx, state_names)
+        lfs.append(lkf_res)
+        final_results.extend(results)
+    # Assuming y_true and other required variables are defined
 
-# mean_results = calculate_mean_of_results(final_results)
-# print(mean_results)
+mean_results = calculate_mean_of_results(final_results)
+print(mean_results)
 
 # Define a range of possible sigma_p and sigma_v values to test
-sigma_p_values = np.linspace(0.1, 1.0, 10)  # Replace with your own range
-sigma_v_values = np.linspace(0.01, 0.1, 10)  # Replace with your own range
-
+sigma_p_values = np.linspace(0.001, 2.0, 50)  # Replace with your own range
+sigma_v_values = np.linspace(0.001, 2.0, 50)  # Replace with your own range
+print("sigma-p considered",sigma_p_values)
+print("sigma-v considered",sigma_v_values)
 # Initialize variables to hold the best parameters and the lowest error
 best_sigma_p = None
 best_sigma_v = None
@@ -106,6 +107,7 @@ for train_index, val_index in kf.split(traj_positions_list):
     # Loop over each candidate sigma_p and sigma_v value
     for sigma_p in sigma_p_values:
         for sigma_v in sigma_v_values:
+            print("sigmaP",sigma_p,"sigma_v",sigma_v)
             process_noise = np.array([
                 [sigma_p ** 2, 0, 0, 0],
                 [0, sigma_p ** 2, 0, 0],

@@ -1,7 +1,7 @@
 """"
 The testing generates a 
 
-inference.csv delimited with ','  and a '\n' after reach row with headers  
+inference.csv delimited with ','  and a '\n' after reach row with the following headers  
 
 run_id,source_dataset,source_domain,target_domain,best/epoch,mode,*TRAINING_HYPERPARAMETERS,*METRICS 
 

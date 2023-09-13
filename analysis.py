@@ -3,7 +3,7 @@ from matplotlib.patches import Circle
 import numpy as np
 import itertools
 from collections import defaultdict
-
+from sklearn.model_selection import KFold
 def define_method_style(info_dicts):
     colors = itertools.cycle(['r', 'b', 'm', 'c', 'y'])
     markers = itertools.cycle(['D', 'o', 's', '*', 'v', '^'])
@@ -377,4 +377,79 @@ def calculate_mean_of_results(final_results):
     
     return mean_dict
 
-# Calculate the mean of each key in final_results
+
+
+# import numpy as np
+# from collections import defaultdict
+
+# def cross_validate_kalman_filter(traj_positions_list, initial_state, dt, initial_covariance, measurement_noise, state_transition, control_input, observation_matrix, col_idx, state_names):
+#     # Define a range of possible sigma_p and sigma_v values to test
+#     sigma_p_values = np.linspace(0.1, 1.0, 10)
+#     sigma_v_values = np.linspace(0.01, 0.1, 10)
+    
+#     # Initialize variables to hold the best parameters and the lowest error
+#     best_sigma_p = None
+#     best_sigma_v = None
+#     lowest_error = float('inf')
+    
+#     # Initialize 5-fold cross-validation
+#     kf = KFold(n_splits=5)
+    
+#     # Loop over each fold
+#     for train_index, val_index in kf.split(traj_positions_list):
+#         train_data = [traj_positions_list[i] for i in train_index]
+#         val_data = [traj_positions_list[i] for i in val_index]
+        
+#         # Loop over each candidate sigma_p and sigma_v value
+#         for sigma_p in sigma_p_values:
+#             for sigma_v in sigma_v_values:
+#                 process_noise = np.array([
+#                     [sigma_p ** 2, 0, 0, 0],
+#                     [0, sigma_p ** 2, 0, 0],
+#                     [0, 0, sigma_v ** 2, 0],
+#                     [0, 0, 0, sigma_v ** 2]
+#                 ])
+                
+#                 # Initialize Kalman Filter with the current sigma_p and sigma_v
+#                 kf = KalmanFilter(
+#                     initial_state=initial_state,
+#                     measurement_period=dt,
+#                     initial_covariance=initial_covariance,
+#                     process_noise=process_noise,
+#                     measurement_noise=measurement_noise,
+#                     state_transition_func=state_transition,
+#                     control_input_func=control_input,
+#                     observation_matrix=observation_matrix,
+#                     sensor_idx=f"{sigma_p}_{sigma_v}"
+#                 )
+                
+#                 # Initialize error for this sigma_p and sigma_v
+#                 total_error = 0
+                
+#                 # Loop over each trajectory in the validation set
+#                 for positions in val_data:
+#                     reshaped_input_positions = [row.reshape(-1, 1) for row in positions.input_noisy_measures]
+#                     reshaped_input_positions = np.array(reshaped_input_positions)
+#                     lkf_res = kf.run(reshaped_input_positions)
+                    
+#                     # Calculate errors using your function
+#                     results = calculate_errors(positions.ground_truth_forecast, [lkf_res], col_idx, state_names)
+                    
+#                     # Add the 'aggregated_error' to 'total_error'
+#                     for result in results:
+#                         total_error += np.mean(result['aggregated_error'])
+                
+#                 # Calculate mean error for this sigma_p and sigma_v
+#                 mean_error = total_error / len(val_data)
+                
+#                 # Update best parameters if this sigma_p and sigma_v have lower error
+#                 if mean_error < lowest_error:
+#                     best_sigma_p = sigma_p
+#                     best_sigma_v = sigma_v
+#                     lowest_error = mean_error
+    
+#     return best_sigma_p, best_sigma_v, lowest_error
+
+# # Usage
+# best_sigma_p, best_sigma_v, lowest_error = cross_validate_kalman_filter(traj_positions_list, initial_state, dt, initial_covariance, measurement_noise, state_transition, control_input, observation_matrix, col_idx, state_names)
+# print(f"The best sigma_p value is {best_sigma_p} and the best sigma_v value is {best_sigma_v} with a mean error of {lowest_error}")
