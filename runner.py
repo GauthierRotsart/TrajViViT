@@ -15,6 +15,7 @@ import os
 
 @hydra.main(version_base="1.3", config_path="conf", config_name="config")
 def main(cfg):
+    os.environ["WANDB__SERVICE_WAIT"] = "300"
     save_run = cfg.save_run
     verbose = cfg.verbose
     if save_run:
@@ -38,7 +39,7 @@ def main(cfg):
 
     # PARAMETERS OF THE TRAINING
     data_path = cfg.data_path
-    saving_path = cfg.saving_path + "TrajViViT-models/"
+    saving_path = cfg.saving_path + "TrajViViT-models-test/"
     if save_run:
         if not os.path.exists(saving_path):
             os.umask(0)  # for the file permission

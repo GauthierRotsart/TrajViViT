@@ -48,26 +48,27 @@ class TrajDataset(dataset.Dataset):
             print("opening track " + str(self.track_id) + " from " + self.folder)
 
         traj = self.raw_data[self.raw_data["track_id"] == self.track_id]  # get all positions of track
+        print(traj)
         memo = {}
         src = []
         tgt = []
         coords = []
-
-        for i in range(len(traj) - self.n_next - self.n_prev):
-            x = self.get_n_images_after_i(self.folder, traj, self.n_prev, i, memo)  # n_prev images used to predict
-            src.append(x)
-            c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
-            coords.append(Tensor(c.values))
-            y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
-                ["x", "y"]]  # images that should be predicted
-            tgt.append(Tensor(y.values))
-
-        self.src = src  # torch.stack(src, dim=0)
-        self.coords = self.normalize_coords(torch.stack(coords, dim=0))
-        self.tgt = self.normalize_coords(torch.stack(tgt, dim=0))
+        if len(traj) > self.n_next + self.n_prev:
+            for i in range(len(traj) - self.n_next - self.n_prev + 1):
+                x = self.get_n_images_after_i(self.folder, traj, self.n_prev, i, memo)  # n_prev images used to predict
+                src.append(x)
+                c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
+                coords.append(Tensor(c.values))
+                y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
+                    ["x", "y"]]  # images that should be predicted
+                tgt.append(Tensor(y.values))
+  
+            self.src = torch.stack(src, dim=0)  # src
+            self.coords = self.normalize_coords(torch.stack(coords, dim=0))
+            self.tgt = self.normalize_coords(torch.stack(tgt, dim=0))
 
         return self.src, self.coords, self.tgt
-
+        
     def normalize_coords(self, tgt):
         return tgt / self.get_image_size()[0]
 

@@ -10,7 +10,7 @@ class Trainer:
 
     def __init__(self, model, criterion, optimizer, scheduler, epochs, teacher_forcing, box_size, scene, video,
                  pos_bool, img_bool, multi_cam, save_run, saving_path, data_folders, n_prev, n_next, img_step, prop,
-                 batch_size, img_size, verbose, device):
+                 batch_size, img_size, verbose, device, mean=0, var=0):
 
         self.model = model
         self.data_folders = data_folders
@@ -40,6 +40,8 @@ class Trainer:
         self.box_size = box_size
         self.batch_size = batch_size
         self.img_size = img_size
+        self.mean = mean
+        self.var = var
 
     def create_batch(self, src, tgt, coords, start, stop):
         batch_src = torch.zeros((self.batch_size, self.n_prev, self.img_size, self.img_size))
@@ -151,3 +153,41 @@ class Trainer:
                     loss = self.criterion(pred, y_val)
                     val_loss.append(loss.item())
         return np.mean(val_loss)
+
+    # TEST LOOP
+    def test(self):
+        with torch.no_grad():
+            self.model.eval()
+
+            test_loss_x = []
+            test_loss_y = []
+            for folder in self.data_folders:
+                test_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step,
+                                       prop=self.prop,
+                                       folder=folder, part=2, box_size=self.box_size, verbose=self.verbose)
+                track_ids = test_data.get_track_ids()
+
+                for track_id in track_ids:
+                    src, coords, tgt = test_data.get_track_data(track_id=track_id)
+                    start = 0
+                    for stop in range(self.batch_size, len(src), self.batch_size):
+                        batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                              start=start, stop=stop)
+                        start = stop
+
+                        x_test = batch_src.to(self.device)
+                        y_test = batch_tgt.to(self.device)
+                        src_coord = batch_coord.to(self.device) + torch.normal(mean=self.mean, std=np.sqrt(self.var),
+                                                                               size=batch_coord.shape).to(self.device)
+
+                    future = None
+                    for k in range(y_test.shape[1]):
+                        pred, future = self.model(video=x_test, tgt=future, src=src_coord)
+
+                    loss = torch.abs(pred - y_test)
+                    test_loss_x.append(torch.mean(loss, dim=0)[:, 0].detach().cpu().numpy())
+                    test_loss_y.append(torch.mean(loss, dim=0)[:, 1].detach().cpu().numpy())
+
+                error_x = np.mean(test_loss_x, axis=0)
+                error_y = np.mean(test_loss_y, axis=0)
+        return error_x, error_y
