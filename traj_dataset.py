@@ -48,7 +48,6 @@ class TrajDataset(dataset.Dataset):
             print("opening track " + str(self.track_id) + " from " + self.folder)
 
         traj = self.raw_data[self.raw_data["track_id"] == self.track_id]  # get all positions of track
-        print(traj)
         memo = {}
         src = []
         tgt = []

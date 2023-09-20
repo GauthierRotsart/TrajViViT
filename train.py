@@ -43,11 +43,11 @@ class Trainer:
         self.mean = mean
         self.var = var
 
-    def create_batch(self, src, tgt, coords, start, stop):
-        batch_src = torch.zeros((self.batch_size, self.n_prev, self.img_size, self.img_size))
-        batch_tgt = torch.zeros((self.batch_size, self.n_next, 2))  # coord. in pixels
-        batch_coord = torch.zeros((self.batch_size, self.n_prev, 2))  # coord. in pixels
-        for i in range(self.batch_size):
+    def create_batch(self, src, tgt, coords, start, stop, size):
+        batch_src = torch.zeros((size, self.n_prev, self.img_size, self.img_size))
+        batch_tgt = torch.zeros((size, self.n_next, 2))  # coord. in pixels
+        batch_coord = torch.zeros((size, self.n_prev, 2))  # coord. in pixels
+        for i in range(size):
             batch_src[i, :, :, :] = src[start:stop][i]
             batch_tgt[i, :, :] = tgt[start:stop][i]
             batch_coord[i, :, :] = coords[start:stop][i]
@@ -73,8 +73,15 @@ class Trainer:
                         src, coords, tgt = train_data.get_track_data(track_id=track_id)
                         start = 0
                         for stop in range(self.batch_size, len(src), self.batch_size):
-                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                  start=start, stop=stop)
+                            if len(src) - stop > self.batch_size:
+                                batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                      start=start, stop=stop,
+                                                                                      size=self.batch_size)
+                            else:
+                                new_batch_size = len(src) - stop
+                                batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                      start=stop, stop=len(src),
+                                                                                      size=new_batch_size)
                             start = stop
 
                             x_train = batch_src.to(self.device)
@@ -83,7 +90,7 @@ class Trainer:
                             self.optimizer.zero_grad()
 
                             if epoch < self.teacher_forcing:  # Teacher forcing approach
-                                pred, _ = self.model(x_train, y_train, src_coord)
+                                pred, _ = self.model(video=x_train, tgt=y_train, src=src_coord)
                             else:  # Autoregressive approach
                                 future = None
                                 n_next = y_train.shape[1]
@@ -138,8 +145,15 @@ class Trainer:
                     src, coords, tgt = val_data.get_track_data(track_id=track_id)
                     start = 0
                     for stop in range(self.batch_size, len(src), self.batch_size):
-                        batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                              start=start, stop=stop)
+                        if len(src) - stop > self.batch_size:
+                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                  start=start, stop=stop,
+                                                                                  size=self.batch_size)
+                        else:
+                            new_batch_size = len(src) - stop
+                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                  start=stop, stop=len(src),
+                                                                                  size=new_batch_size)
                         start = stop
 
                         x_val = batch_src.to(self.device)
@@ -171,8 +185,15 @@ class Trainer:
                     src, coords, tgt = test_data.get_track_data(track_id=track_id)
                     start = 0
                     for stop in range(self.batch_size, len(src), self.batch_size):
-                        batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                              start=start, stop=stop)
+                        if len(src) - stop > self.batch_size:
+                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                  start=start, stop=stop,
+                                                                                  size=self.batch_size)
+                        else:
+                            new_batch_size = len(src) - stop
+                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
+                                                                                  start=stop, stop=len(src),
+                                                                                  size=new_batch_size)
                         start = stop
 
                         x_test = batch_src.to(self.device)
