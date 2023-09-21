@@ -1,20 +1,20 @@
 import torch
 import wandb
 import numpy as np
-import random
 from tqdm import tqdm
 from utils import get_run_name
-from traj_dataset import TrajDataset
 
 
 class Trainer:
 
-    def __init__(self, model, criterion, optimizer, scheduler, epochs, teacher_forcing, box_size, scene, video,
-                 pos_bool, img_bool, multi_cam, save_run, saving_path, data_folders, n_prev, n_next, img_step, prop,
-                 batch_size, img_size, verbose, device, mean=0, var=0):
+    def __init__(self, model, train_data, val_data, test_data, criterion, optimizer, scheduler, epochs, teacher_forcing,
+                 box_size, scene, video, pos_bool, img_bool, multi_cam, save_run, saving_path, verbose, device):
 
         self.model = model
-        self.data_folders = data_folders
+        self.train_data = train_data
+        self.val_data = val_data
+        self.test_data = test_data
+
         self.teacher_forcing = teacher_forcing
         self.criterion = criterion
         self.optimizer = optimizer
@@ -33,29 +33,6 @@ class Trainer:
         self.name = get_run_name(multi_cam=self.multi_cam, box_size=self.box_size, pos_bool=self.pos_bool,
                                  img_bool=self.img_bool, scene=self.scene, video_id=self.video) + '.pt'
         self.device = device
-        self.data_folders = data_folders
-        self.n_prev = n_prev
-        self.n_next = n_next
-        self.img_step = img_step
-        self.prop = prop
-        self.box_size = box_size
-        self.batch_size = batch_size
-        self.img_size = img_size
-        self.mean = mean
-        self.var = var
-        self.list_of_position = []
-
-    def create_batch(self, src, tgt, coords, start, stop, size):
-        batch_src = torch.zeros((size, self.n_prev, self.img_size, self.img_size))
-        batch_tgt = torch.zeros((size, self.n_next, 2))  # coord. in pixels
-        batch_coord = torch.zeros((size, self.n_prev, 2))  # coord. in pixels
-        for i in range(size):
-            batch_src[i, :, :, :] = src[self.list_of_position[i], :, :, :]
-            batch_tgt[i, :, :] = tgt[self.list_of_position[i], :, :]
-            batch_coord[i, :, :] = coords[self.list_of_position[i], :, :]
-            del self.list_of_position[i]
-
-        return batch_src, batch_tgt, batch_coord
 
     # TRAINING LOOP
     def train(self):
@@ -66,50 +43,30 @@ class Trainer:
             for epoch in range(self.epochs):
                 train_loss = []
                 self.model.train()
-                for folder in self.data_folders:
-                    train_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step,
-                                             prop=self.prop, folder=folder, part=0, box_size=self.box_size,
-                                             verbose=self.verbose)
-                    track_ids = train_data.get_track_ids()
+                for step, train_batch in enumerate(self.train_data):
 
-                    for track_id in track_ids:
-                        src, coords, tgt = train_data.get_track_data(track_id=track_id)
-                        self.list_of_position = [i for i in range(len(src))]
-                        random.shuffle(self.list_of_position)
-                        start = 0
-                        for stop in range(self.batch_size, len(src), self.batch_size):
-                            if len(src) - stop > self.batch_size:
-                                batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                      start=start, stop=stop,
-                                                                                      size=self.batch_size)
-                            else:
-                                new_batch_size = len(src) - stop
-                                batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                      start=stop, stop=len(src),
-                                                                                      size=new_batch_size)
-                            start = stop
+                    x_train = train_batch["src"].to(self.device)
+                    y_train = train_batch["tgt"].to(self.device)
+                    src_coord = train_batch["coords"].to(self.device)
 
-                            x_train = batch_src.to(self.device)
-                            y_train = batch_tgt.to(self.device)
-                            src_coord = batch_coord.to(self.device)
-                            self.optimizer.zero_grad()
+                    self.optimizer.zero_grad()
 
-                            if epoch < self.teacher_forcing:  # Teacher forcing approach
-                                pred, _ = self.model(video=x_train, tgt=y_train, src=src_coord)
-                            else:  # Autoregressive approach
-                                future = None
-                                n_next = y_train.shape[1]
-                                for k in range(n_next):
-                                    pred, future = self.model(video=x_train, tgt=future, src=src_coord)
+                    if epoch < self.teacher_forcing:  # Teacher forcing approach
+                        pred, _ = self.model(x_train, y_train, src_coord)
+                    else:  # Autoregressive approach
+                        future = None
+                        n_next = y_train.shape[1]
+                        for k in range(n_next):
+                            pred, future = self.model(video=x_train, tgt=future, src=src_coord)
 
-                            loss = self.criterion(pred, y_train)
+                    loss = self.criterion(pred, y_train)
 
-                            train_loss.append(loss.item())
-                            loss.backward()
-                            self.optimizer.step()
-                            self.scheduler.step()
+                    train_loss.append(loss.item())
+                    loss.backward()
+                    self.optimizer.step()
+                    self.scheduler.step()
 
-                            t_epoch.set_postfix(loss=np.mean(loss.item()))
+                    t_epoch.set_postfix(loss=np.mean(loss.item()))
 
                 current_loss = self.validation()
                 if self.verbose:
@@ -141,83 +98,42 @@ class Trainer:
             self.model.eval()
 
             val_loss = []
-            for folder in self.data_folders:
-                val_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step, prop=self.prop,
-                                       folder=folder, part=1, box_size=self.box_size, verbose=self.verbose)
-                track_ids = val_data.get_track_ids()
+            for _, val_batch in enumerate(self.val_data):
 
-                for track_id in track_ids:
-                    src, coords, tgt = val_data.get_track_data(track_id=track_id)
-                    self.list_of_position = [i for i in range(len(src))]
-                    random.shuffle(self.list_of_position)
-                    start = 0
-                    for stop in range(self.batch_size, len(src), self.batch_size):
-                        if len(src) - stop > self.batch_size:
-                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                  start=start, stop=stop,
-                                                                                  size=self.batch_size)
-                        else:
-                            new_batch_size = len(src) - stop
-                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                  start=stop, stop=len(src),
-                                                                                  size=new_batch_size)
-                        start = stop
+                x_val = val_batch["src"].to(self.device)
+                y_val = val_batch["tgt"].to(self.device)
+                src_coord = val_batch["coords"].to(self.device)
 
-                        x_val = batch_src.to(self.device)
-                        y_val = batch_tgt.to(self.device)
-                        src_coord = batch_coord.to(self.device)
+                future = None
+                for k in range(y_val.shape[1]):
+                    pred, future = self.model(video=x_val, tgt=future, src=src_coord)
 
-                    future = None
-                    for k in range(y_val.shape[1]):
-                        pred, future = self.model(video=x_val, tgt=future, src=src_coord)
-
-                    loss = self.criterion(pred, y_val)
-                    val_loss.append(loss.item())
+                loss = self.criterion(pred, y_val)
+                val_loss.append(loss.item())
         return np.mean(val_loss)
 
-    # TEST LOOP
+    # VALIDATION LOOP
     def test(self):
         with torch.no_grad():
             self.model.eval()
 
             test_loss_x = []
             test_loss_y = []
-            for folder in self.data_folders:
-                test_data = TrajDataset(n_prev=self.n_prev, n_next=self.n_next, img_step=self.img_step,
-                                       prop=self.prop,
-                                       folder=folder, part=2, box_size=self.box_size, verbose=self.verbose)
-                track_ids = test_data.get_track_ids()
+            for _, test_batch in enumerate(self.test_data):
 
-                for track_id in track_ids:
-                    src, coords, tgt = test_data.get_track_data(track_id=track_id)
-                    self.list_of_position = [i for i in range(len(src))]
-                    random.shuffle(self.list_of_position)
-                    start = 0
-                    for stop in range(self.batch_size, len(src), self.batch_size):
-                        if len(src) - stop > self.batch_size:
-                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                  start=start, stop=stop,
-                                                                                  size=self.batch_size)
-                        else:
-                            new_batch_size = len(src) - stop
-                            batch_src, batch_tgt, batch_coord = self.create_batch(src=src, tgt=tgt, coords=coords,
-                                                                                  start=stop, stop=len(src),
-                                                                                  size=new_batch_size)
-                        start = stop
+                x_test = test_batch["src"].to(self.device)
+                y_test = test_batch["tgt"].to(self.device)
+                src_coord = test_batch["coords"].to(self.device)
 
-                        x_test = batch_src.to(self.device)
-                        y_test = batch_tgt.to(self.device)
-                        src_coord = batch_coord.to(self.device) + torch.normal(mean=self.mean, std=np.sqrt(self.var),
-                                                                               size=batch_coord.shape).to(self.device)
+                future = None
+                for k in range(y_test.shape[1]):
+                    pred, future = self.model(video=x_test, tgt=future, src=src_coord)
 
-                    future = None
-                    for k in range(y_test.shape[1]):
-                        pred, future = self.model(video=x_test, tgt=future, src=src_coord)
+                loss = torch.abs(pred - y_test)
+                test_loss_x.append(torch.mean(loss, dim=0)[:, 0].detach().cpu().numpy())
+                test_loss_y.append(torch.mean(loss, dim=0)[:, 1].detach().cpu().numpy())
 
-                    loss = torch.abs(pred - y_test)
-                    test_loss_x.append(torch.mean(loss, dim=0)[:, 0].detach().cpu().numpy())
-                    test_loss_y.append(torch.mean(loss, dim=0)[:, 1].detach().cpu().numpy())
+            error_x = np.mean(test_loss_x, axis=0)
+            error_y = np.mean(test_loss_y, axis=0)
 
-                error_x = np.mean(test_loss_x, axis=0)
-                error_y = np.mean(test_loss_y, axis=0)
         return error_x, error_y

@@ -22,7 +22,7 @@ img: False
 multi_cam: []
 
 save_run: True
-verbose: False #for displaying printing info
+verbose: False  # for displaying printing info
 
 data_path: "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
 saving_path: "/linux/grotsartdehe/"
