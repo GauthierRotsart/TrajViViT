@@ -1,4 +1,4 @@
-from train import Trainer
+from train2 import Trainer
 from utils import get_run_name, get_default_device, to_device, get_folders
 from trajViViT import TrajViVit
 from torch.optim import *

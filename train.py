@@ -1,6 +1,7 @@
 import torch
 import wandb
 import numpy as np
+import random
 from tqdm import tqdm
 from utils import get_run_name
 from traj_dataset import TrajDataset
@@ -42,15 +43,17 @@ class Trainer:
         self.img_size = img_size
         self.mean = mean
         self.var = var
+        self.list_of_position = []
 
     def create_batch(self, src, tgt, coords, start, stop, size):
         batch_src = torch.zeros((size, self.n_prev, self.img_size, self.img_size))
         batch_tgt = torch.zeros((size, self.n_next, 2))  # coord. in pixels
         batch_coord = torch.zeros((size, self.n_prev, 2))  # coord. in pixels
         for i in range(size):
-            batch_src[i, :, :, :] = src[start:stop][i]
-            batch_tgt[i, :, :] = tgt[start:stop][i]
-            batch_coord[i, :, :] = coords[start:stop][i]
+            batch_src[i, :, :, :] = src[self.list_of_position[i], :, :, :]
+            batch_tgt[i, :, :] = tgt[self.list_of_position[i], :, :]
+            batch_coord[i, :, :] = coords[self.list_of_position[i], :, :]
+            del self.list_of_position[i]
 
         return batch_src, batch_tgt, batch_coord
 
@@ -71,6 +74,8 @@ class Trainer:
 
                     for track_id in track_ids:
                         src, coords, tgt = train_data.get_track_data(track_id=track_id)
+                        self.list_of_position = [i for i in range(len(src))]
+                        random.shuffle(self.list_of_position)
                         start = 0
                         for stop in range(self.batch_size, len(src), self.batch_size):
                             if len(src) - stop > self.batch_size:
@@ -143,6 +148,8 @@ class Trainer:
 
                 for track_id in track_ids:
                     src, coords, tgt = val_data.get_track_data(track_id=track_id)
+                    self.list_of_position = [i for i in range(len(src))]
+                    random.shuffle(self.list_of_position)
                     start = 0
                     for stop in range(self.batch_size, len(src), self.batch_size):
                         if len(src) - stop > self.batch_size:
@@ -183,6 +190,8 @@ class Trainer:
 
                 for track_id in track_ids:
                     src, coords, tgt = test_data.get_track_data(track_id=track_id)
+                    self.list_of_position = [i for i in range(len(src))]
+                    random.shuffle(self.list_of_position)
                     start = 0
                     for stop in range(self.batch_size, len(src), self.batch_size):
                         if len(src) - stop > self.batch_size:
