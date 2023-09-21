@@ -6,7 +6,7 @@ from torchvision import transforms
 import random
 import numpy as np
 from PIL import Image
-import glob
+
 
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
@@ -25,12 +25,8 @@ class TrajDataset(dataset.Dataset):
 
         self.path = path
 
-        src = []
-        tgt = []
-        coords = []
         path = [] if path else False
         self.files = []
-        self.track_pos = []
         self.pos = []
         for folder in self.data_folders:
             rand = random.Random(42)
@@ -45,24 +41,15 @@ class TrajDataset(dataset.Dataset):
             for track_id in track_ids:
                 #print("opening track " + str(track_id) + " from " + folder)
                 traj = raw_data[raw_data["track_id"] == track_id]  # get all positions of track
-                self.track_pos.append(len(traj))
                 memo = {}
                 for i in range(len(traj) - self.n_next - self.n_prev):
                     if path != False:
                         path.append(folder)
                     x = self.get_n_images_after_i(folder, traj, self.n_prev, i, memo, fill=True)  # n_prev images used to predict
-                    #src.append(x)
                     c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
-                    #coords.append(Tensor(c.values))
                     y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
                         ["x", "y"]]  # images that should be predicted
-                    #tgt.append(Tensor(y.values))
-        """
-        self.src = torch.stack(src, dim=0)
-        self.coords = self.normalize_coords(torch.stack(coords, dim=0))
-        self.tgt = self.normalize_coords(torch.stack(tgt, dim=0))
-        self.path = path
-        """
+
     def normalize_coords(self, tgt):
         return tgt / self.get_image_size()[0]
 
@@ -101,27 +88,16 @@ class TrajDataset(dataset.Dataset):
             img = Image.open(img_path)
             img_tensor = self.to_tensor(img)
             x.append(img_tensor)
-        self.src = torch.cat(x)
-        #print(img_path)
 
-        count = 0
-        for i in range(len(self.track_pos)):
-            count += self.track_pos[i] -20
-            if count >= item:
-                pos = count - item
-                break
-        #print(track_id)
-        #print(count,item,pos)
         pos = self.pos[item]
         traj = self.raw_data[self.raw_data["track_id"] == int(track_id)]  # get all positions of track
         c = traj.iloc[pos: pos + self.n_prev][["x", "y"]]  # coordinates of the previous images
-
-        # coords.append(Tensor(c.values))
         y = traj.iloc[pos + self.n_prev: pos + self.n_prev + self.n_next][
             ["x", "y"]]  # images that should be predicted
+
+        self.src = torch.cat(x)
         self.coords = self.normalize_coords(Tensor(c.values))
         self.tgt = self.normalize_coords(Tensor(y.values))
-
         return {
             'src': self.src,
             'coords': self.coords,
