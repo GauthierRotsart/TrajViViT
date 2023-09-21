@@ -21,7 +21,7 @@ def main(cfg):
     verbose = cfg.verbose
     if save_run:
         wandb.login()
-        run = wandb.init(project="TrajViViT")
+        run = wandb.init(project="TrajViViT-SDD")
         wandb.config.update(cfg.model.params)
 
     print(cfg.model)
@@ -84,14 +84,15 @@ def main(cfg):
 
     props = [train_prop, val_prop, test_prop]
     train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
-                             box_size=box_size)
+                             box_size=box_size, verbose=verbose)
     val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1,
-                           box_size=box_size)
+                           box_size=box_size, verbose=verbose)
     test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
-                            box_size=box_size)
-    print("TRAIN", len(train_data))
-    print("VAL", len(val_data))
-    print("TEST", len(test_data))
+                            box_size=box_size, verbose=verbose)
+    if verbose:
+        print("TRAIN", len(train_data))
+        print("VAL", len(val_data))
+        print("TEST", len(test_data))
 
     train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
@@ -149,8 +150,8 @@ def main(cfg):
     configuration = {
         "model": model,
         "train_data": train_loader,
-        "test_data": test_loader,
         "val_data": val_loader,
+        "test_data": test_loader,
         "criterion": criterion,
         "optimizer": opt,
         "scheduler": scheduler,

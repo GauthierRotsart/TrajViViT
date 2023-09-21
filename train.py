@@ -7,13 +7,13 @@ from utils import get_run_name
 
 class Trainer:
 
-    def __init__(self, model, train_data, test_data, val_data, criterion, optimizer, scheduler, epochs, teacher_forcing,
+    def __init__(self, model, train_data, val_data, test_data, criterion, optimizer, scheduler, epochs, teacher_forcing,
                  box_size, scene, video, pos_bool, img_bool, multi_cam, save_run, saving_path, verbose, device):
 
         self.model = model
         self.train_data = train_data
-        self.test_data = test_data
         self.val_data = val_data
+        self.test_data = test_data
 
         self.teacher_forcing = teacher_forcing
         self.criterion = criterion
@@ -112,3 +112,28 @@ class Trainer:
                 val_loss.append(loss.item())
         return np.mean(val_loss)
 
+    # VALIDATION LOOP
+    def test(self):
+        with torch.no_grad():
+            self.model.eval()
+
+            test_loss_x = []
+            test_loss_y = []
+            for _, test_batch in enumerate(self.test_data):
+
+                x_test = test_batch["src"].to(self.device)
+                y_test = test_batch["tgt"].to(self.device)
+                src_coord = test_batch["coords"].to(self.device)
+
+                future = None
+                for k in range(y_test.shape[1]):
+                    pred, future = self.model(video=x_test, tgt=future, src=src_coord)
+
+                loss = torch.abs(pred - y_test)
+                test_loss_x.append(torch.mean(loss, dim=0)[:, 0].detach().cpu().numpy())
+                test_loss_y.append(torch.mean(loss, dim=0)[:, 1].detach().cpu().numpy())
+
+            error_x = np.mean(test_loss_x, axis=0)
+            error_y = np.mean(test_loss_y, axis=0)
+
+        return error_x, error_y

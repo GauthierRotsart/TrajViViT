@@ -11,72 +11,47 @@ from PIL import Image
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
-    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part=0, limit=None, path=False, box_size=0):
+    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part, box_size, verbose):
 
         self.data_folders = data_folders
         self.n_prev = n_prev
         self.n_next = n_next
         self.img_step = img_step
         self.box_size = box_size
+        self.verbose = verbose
         if self.box_size == 0:
             self.block_size = "Variable"
         else:
             self.block_size = int(data_folders[0].split("_")[-3])
 
-        self.path = path
-
-        path = [] if path else False
         self.files = []
         self.pos = []
+
         for folder in self.data_folders:
+            self.folder = folder
             rand = random.Random(42)
-            raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
-            all_ids = raw_data[raw_data['occluded'] != 1]["track_id"].unique()
+            self.raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
+            all_ids = self.raw_data[self.raw_data['occluded'] != 1]["track_id"].unique()
             rand.shuffle(all_ids)
             split_index = (len(all_ids) * np.cumsum(prop)).astype(int)
             trajs_index = np.split(all_ids, split_index[:-1])[part]
-            track_ids = raw_data["track_id"].unique()[trajs_index][:limit]
+            track_ids = self.raw_data["track_id"].unique()[trajs_index]
 
-            self.raw_data = raw_data
             for track_id in track_ids:
-                #print("opening track " + str(track_id) + " from " + folder)
-                traj = raw_data[raw_data["track_id"] == track_id]  # get all positions of track
-                memo = {}
+                if self.verbose:
+                    print("opening track " + str(track_id) + " from " + folder)
+                traj = self.raw_data[self.raw_data["track_id"] == track_id]  # get all positions of track
                 for i in range(len(traj) - self.n_next - self.n_prev):
-                    if path != False:
-                        path.append(folder)
-                    x = self.get_n_images_after_i(folder, traj, self.n_prev, i, memo, fill=True)  # n_prev images used to predict
-                    c = traj.iloc[i: i + self.n_prev][["x", "y"]]  # coordinates of the previous images
-                    y = traj.iloc[i + self.n_prev: i + self.n_prev + self.n_next][
-                        ["x", "y"]]  # images that should be predicted
+                    track_id = traj.iloc[i, :]["track_id"]
+                    frame = traj.iloc[i, :]["frame"]
+                    path = f"{folder}/{track_id:03d}_{frame:05d}.jpg"
+                    self.files.append(path)
+                    self.pos.append(i)
 
     def normalize_coords(self, tgt):
         return tgt / self.get_image_size()[0]
 
-    def get_n_images_after_i(self, folder, traj, n, i, memo, fill=False):
-        self.pos.append(i)
-        count = 0
-        X = []
-
-        for ind, pos in traj.iloc[i: i + n, :].iterrows():
-            track_id = pos["track_id"]
-            frame = pos["frame"]
-            path = f"{folder}/{track_id:03d}_{frame:05d}.jpg"
-            if path in memo:
-                img = memo[path]
-            else:
-                img = Image.open(f"{folder}/{track_id:03d}_{frame:05d}.jpg")
-                memo[path] = img
-            img_tensor = self.to_tensor(img)
-            X.append(img_tensor)
-            if count == 0 and fill is True:
-                self.files.append(path)
-            count += 1
-
-        return torch.cat(X)
-
     def __getitem__(self, item):
-        self.folder = '/waldo/walban/student_datasets/arfranck/SDD/scenes/nexus/video0/frames_(224, 224)_step_12/'
         img_file = self.files[item]
         img = img_file.split('/')[-1]
         img_track = img.split('.')[0]
@@ -110,13 +85,6 @@ class TrajDataset(dataset.Dataset):
     def get_image_size(self):
         return self.src[0].size()[1:]
 
-    def get_dataset_infos(self):
-        return {"image_size": self.get_image_size(),
-                "n_prev": self.n_prev,
-                "n_next": self.n_next,
-                "block_size": self.block_size
-                }
-
     @classmethod
     def conf_to_folders(cls, confname):
         folder_list = []
@@ -143,4 +111,3 @@ class TrajDataset(dataset.Dataset):
             else:
                 raise NotImplementedError
         return folder_list
-
