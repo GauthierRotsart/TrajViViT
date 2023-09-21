@@ -40,7 +40,7 @@ def main(cfg):
 
     # PARAMETERS OF THE TRAINING
     data_path = cfg.data_path
-    saving_path = cfg.saving_path + "TrajViViT-models/"
+    saving_path = cfg.saving_path + "TrajViViT-SDD/"
     if save_run:
         if not os.path.exists(saving_path):
             os.umask(0)  # for the file permission
