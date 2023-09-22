@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 
 
+# Custom dataset for lazy loading
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
@@ -28,25 +29,24 @@ class TrajDataset(dataset.Dataset):
         self.pos = []
 
         for folder in self.data_folders:
-            self.folder = folder
             rand = random.Random(42)
-            self.raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
-            all_ids = self.raw_data[self.raw_data['occluded'] != 1]["track_id"].unique()
+            raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
+            all_ids = raw_data[raw_data['occluded'] != 1]["track_id"].unique()
             rand.shuffle(all_ids)
             split_index = (len(all_ids) * np.cumsum(prop)).astype(int)
             trajs_index = np.split(all_ids, split_index[:-1])[part]
-            track_ids = self.raw_data["track_id"].unique()[trajs_index]
+            track_ids = raw_data["track_id"].unique()[trajs_index]
 
             for track_id in track_ids:
                 if self.verbose:
                     print("opening track " + str(track_id) + " from " + folder)
-                traj = self.raw_data[self.raw_data["track_id"] == track_id]  # get all positions of track
-                for i in range(len(traj) - self.n_next - self.n_prev):
+                traj = raw_data[raw_data["track_id"] == track_id]  # get all positions of track
+                for i in range(len(traj) - self.n_next - self.n_prev + 1):
                     track_id = traj.iloc[i, :]["track_id"]
                     frame = traj.iloc[i, :]["frame"]
                     path = f"{folder}/{track_id:03d}_{frame:05d}.jpg"
-                    self.files.append(path)
-                    self.pos.append(i)
+                    self.files.append(path)  # lazy loading
+                    self.pos.append(i)  # lazy loading
 
     def normalize_coords(self, tgt):
         return tgt / self.get_image_size()[0]
@@ -56,7 +56,13 @@ class TrajDataset(dataset.Dataset):
         img = img_file.split('/')[-1]
         img_track = img.split('.')[0]
         track_id, frame_id = img_track.split('_')
-        track_path = self.folder + f"{int(track_id):03d}_"
+
+        file_split = img_file.split('/')[0:-1]
+        folder = ""
+        for i in range(len(file_split)):
+            folder += f"{file_split[i]}/"
+
+        track_path = folder + f"{int(track_id):03d}_"
         x = []
         for i in range(self.n_prev):
             img_path = track_path + f"{int(frame_id) + 12*i:05d}.jpg"
@@ -64,15 +70,17 @@ class TrajDataset(dataset.Dataset):
             img_tensor = self.to_tensor(img)
             x.append(img_tensor)
 
+        raw_data = pd.read_csv(folder + "/annotations_" + str(self.img_step) + ".txt", sep=" ")
         pos = self.pos[item]
-        traj = self.raw_data[self.raw_data["track_id"] == int(track_id)]  # get all positions of track
+        traj = raw_data[raw_data["track_id"] == int(track_id)]  # get all positions of track
         c = traj.iloc[pos: pos + self.n_prev][["x", "y"]]  # coordinates of the previous images
         y = traj.iloc[pos + self.n_prev: pos + self.n_prev + self.n_next][
-            ["x", "y"]]  # images that should be predicted
+            ["x", "y"]]  # coordinates of the next images
 
         self.src = torch.cat(x)
         self.coords = self.normalize_coords(Tensor(c.values))
         self.tgt = self.normalize_coords(Tensor(y.values))
+
         return {
             'src': self.src,
             'coords': self.coords,
