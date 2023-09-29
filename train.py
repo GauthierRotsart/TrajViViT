@@ -8,7 +8,8 @@ from utils import get_run_name
 class Trainer:
 
     def __init__(self, model, train_data, val_data, test_data, criterion, optimizer, scheduler, epochs, teacher_forcing,
-                 box_size, scene, video, pos_bool, img_bool, multi_cam, save_run, saving_path, verbose, device):
+                 box_size, scene, video, pos_bool, img_bool, multi_cam, save_run, saving_path, verbose, device, mean=0,
+                 var=0):
 
         self.model = model
         self.train_data = train_data
@@ -33,6 +34,8 @@ class Trainer:
         self.name = get_run_name(multi_cam=self.multi_cam, box_size=self.box_size, pos_bool=self.pos_bool,
                                  img_bool=self.img_bool, scene=self.scene, video_id=self.video) + '.pt'
         self.device = device
+        self.mean = mean
+        self.var = var
 
     # TRAINING LOOP
     def train(self):
@@ -112,7 +115,7 @@ class Trainer:
                 val_loss.append(loss.item())
         return np.mean(val_loss)
 
-    # VALIDATION LOOP
+    # TEST LOOP
     def test(self):
         with torch.no_grad():
             self.model.eval()
@@ -124,6 +127,7 @@ class Trainer:
                 x_test = test_batch["src"].to(self.device)
                 y_test = test_batch["tgt"].to(self.device)
                 src_coord = test_batch["coords"].to(self.device)
+                src_coord += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=src_coord.shape).to(self.device)
 
                 future = None
                 for k in range(y_test.shape[1]):

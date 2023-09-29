@@ -38,7 +38,7 @@ def main(cfg):
 	save_run = cfg.save_run
 	verbose = cfg.verbose
 	data_path = cfg.data_path
-	saving_path = cfg.saving_path + "TrajViViT-models/"
+	saving_path = cfg.saving_path + "TrajViViT-SDD/"
 	save_fig = False
 	if isinstance(cfg.device, int):
 		device = get_default_device(cfg.device, multi_gpu=False)
@@ -100,6 +100,22 @@ def main(cfg):
 			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
 									   data_path=data_path, scene=scene_test, video=video_test)
 
+	train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
+							 box_size=box_size, verbose=verbose)
+	val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1,
+						   box_size=box_size, verbose=verbose)
+	test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
+							box_size=box_size, verbose=verbose)
+
+	if verbose:
+		print("TRAIN", len(train_data))
+		print("VAL", len(val_data))
+		print("TEST", len(test_data))
+
+	train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+	val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
+	test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
+
 	video_list = [cfg.video]
 	last_mse_pos = []
 	last_mse_img = []
@@ -129,6 +145,9 @@ def main(cfg):
 
 			configuration = {
 				"model": model,
+				"train_data": train_loader,
+				"val_data": val_loader,
+				"test_data": test_loader,
 				"criterion": criterion,
 				"optimizer": None,
 				"scheduler": None,
@@ -142,18 +161,11 @@ def main(cfg):
 				"multi_cam": multi_cam,
 				"save_run": save_run,
 				"saving_path": saving_path,
-				"data_folders": data_folders,
-				"n_prev": n_prev,
-				"n_next": n_next,
-				"img_step": img_step,
-				"prop": props,
-				"batch_size": batch_size,
-				"img_size": img_size,
 				"verbose": verbose,
 				"device": device,
 				"mean": mean,
 				"var": var
-			}
+					}
 
 			trainer = Trainer(**configuration)
 			error_x, error_y = trainer.test()
@@ -190,20 +202,19 @@ def main(cfg):
 				[[scene, video_id, scene_test, video_test_id, mode, str(mean), str(var)] + list(error_x) + list(error_y) + data_mse + [ade_data, fde_data]],
 				columns=["Source dataset", "Source domain", "Target dataset", "Target domain",
 						 "Mode", "Mean", "Variance"] + header_error_x + header_error_y + header_mse + ["ADE", "FDE"])
-
-			if not os.path.exists(saving_path + "analysis.xlsx"):
-				with pd.ExcelWriter(saving_path + "analysis.xlsx", mode='w') as writer:
+			if not os.path.exists(saving_path + f"analysis_{scene}_{video_id}.xlsx"):
+				with pd.ExcelWriter(saving_path + f"analysis_{scene}_{video_id}.xlsx", mode='w') as writer:
 					df_init = pd.DataFrame([])
 					df_init.to_excel(writer)
-				with pd.ExcelWriter(saving_path + "analysis.xlsx", mode='w') as writer:
+				with pd.ExcelWriter(saving_path + f"analysis_{scene}_{video_id}.xlsx", mode='w') as writer:
 					df.to_excel(writer, index=False)
 			else:
-				wb = load_workbook(saving_path + "analysis.xlsx")
+				wb = load_workbook(saving_path + f"analysis_{scene}_{video_id}.xlsx")
 
 				sheet = wb.active
 				sheet.append(
 					[scene, video_id, scene_test, video_test_id, mode, str(mean), str(var)] + list(error_x) + list(error_y) + data_mse + [ade_data, fde_data])
-				wb.save(saving_path + "analysis.xlsx")
+				wb.save(saving_path + f"analysis_{scene}_{video_id}.xlsx")
 			if save_fig:
 				ax1.plot(horizon, error_x * cfg.size)
 				ax1.set(xlabel="Hozizon [step]", ylabel="Absolute error [pixel]", title="Error along X axis")

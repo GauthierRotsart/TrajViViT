@@ -127,7 +127,7 @@ def main(cfg):
         raise NotImplementedError
 
     # SCHEDULER CHOICE
-    if scheduler_config == 'fixed':
+    if scheduler_config == 'fixed':  # constant learning rate over the training process
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=opt, lr_lambda=lambda epoch: 1)
     elif scheduler_config == 'multi_step_30_60':
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=opt, milestones=[30, 60], gamma=0.1)
