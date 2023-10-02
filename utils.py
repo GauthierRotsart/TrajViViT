@@ -18,68 +18,51 @@ def to_device(data, device):
 	return data.to(device, non_blocking=True)
 
 
-def get_run_name(multi_cam, box_size, pos_bool, img_bool, scene, video_id):
+# Run name on Wandb platform
+def get_run_name(multi_cam, box_size, pos_bool, img_bool, scene, video_id, tf):
+	assert box_size >= 0, "The box size has to be positive."
+	assert tf >= 0, "The teacher forcing argument has to be positive."
+	assert pos_bool is True or img_bool is True, "At least pos_bool or img_bool should be True."
+
 	if len(multi_cam) == 0:  # Training on a single camera
-		if box_size == 0:  # Training on the box given by an object detection algorithm
-			if pos_bool is True and img_bool is True:
-				return scene + "_" + str(video_id) + "_Img+Pos"
-			elif pos_bool is False and img_bool is True:
-				return scene + "_" + str(video_id) + "_Img"
-			elif pos_bool is True and img_bool is False:
-				return scene + "_" + str(video_id) + "_Pos"
-			else:
-				print("The input is at least the positions or the images.")
-				raise NotImplementedError
-		else:
-			if pos_bool is True and img_bool is True:
-				return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Img+Pos"
-			elif pos_bool is False and img_bool is True:
-				return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Img"
-			elif pos_bool is True and img_bool is False:
-				return scene + "_" + str(video_id) + "_box_" + str(box_size) + "_Pos"
-			else:
-				print("The input is at least the positions or the images.")
-				raise NotImplementedError
+		run_name = f"{scene}_{video_id}"
 	else:  # Training on multiple cameras
-		scene_name = ""
+		run_name = ""
 		for sc in multi_cam:
-			scene_name += sc
+			run_name += sc
 
-		if box_size == 0:
-			if pos_bool is True and img_bool is True:
-				return scene_name + "_Img+Pos"
-			elif pos_bool is False and img_bool is True:
-				return scene_name + "_Img"
-			elif pos_bool is True and img_bool is False:
-				return scene_name + "_Pos"
-			else:
-				print("The input is at least the positions or the images.")
-				raise NotImplementedError
-		else:
-			if pos_bool is True and img_bool is True:
-				return scene_name + "_box_" + str(box_size) + "_Img+Pos"
-			elif pos_bool is False and img_bool is True:
-				return scene_name + "_box_" + str(box_size) + "_Img"
-			elif pos_bool is True and img_bool is False:
-				return scene_name + "_box_" + str(box_size) + "_Pos"
-			else:
-				print("The input is at least the positions or the images.")
-				raise NotImplementedError
+	if tf != 100:  # Training with a mix of teacher forcing and autoregressive approaches
+		run_name += f"_tf_{tf}"
 
+	if box_size > 0:  # Training with a specific bbox size
+		run_name += f"_box_{box_size}"
 
-def get_model_name(model_path, img_bool, pos_bool):
-	if img_bool:
-		model_path += "Img"
-		if pos_bool:
-			return model_path + "+Pos.pt"
-		else:
-			return model_path + ".pt"
+	if pos_bool is True and img_bool is True:
+		mode = "Img+Pos"
+	elif pos_bool is False and img_bool is True:
+		mode = "Img"
 	else:
-		if pos_bool:
-			return model_path + "Pos.pt"
-		else:
-			print("The input is at least the positions or the images.")
-			raise NotImplementedError
+		mode = "Pos"
+
+	return run_name + f"_{mode}"
+
+
+# Model name
+def get_model_name(model_path, img_bool, pos_bool, tf):
+	assert tf >= 0, "The teacher forcing argument has to be positive."
+	assert pos_bool is True or img_bool is True, "At least pos_bool or img_bool should be True."
+
+	if tf != 100:
+		model_path += f"_tf_{tf}"
+
+	if pos_bool is True and img_bool is True:
+		mode = "Img+Pos"
+	elif pos_bool is False and img_bool is True:
+		mode = "Img"
+	else:
+		mode = "Pos"
+
+	return f"{model_path}_{mode}.pt"
 
 
 def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video):

@@ -78,7 +78,8 @@ def main(cfg):
 
     if save_run:
         wandb.run.name = get_run_name(multi_cam=multi_cam, box_size=box_size, pos_bool=pos_bool, img_bool=img_bool,
-                                      scene=scene, video_id=str(cfg.video))
+                                      scene=scene, video_id=str(cfg.video), tf=teacher_forcing)
+
     data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
                                data_path=data_path, scene=scene, video=video)
 

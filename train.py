@@ -32,7 +32,7 @@ class Trainer:
         self.saving_path = saving_path
         self.verbose = verbose
         self.name = get_run_name(multi_cam=self.multi_cam, box_size=self.box_size, pos_bool=self.pos_bool,
-                                 img_bool=self.img_bool, scene=self.scene, video_id=self.video) + '.pt'
+                                 img_bool=self.img_bool, scene=self.scene, video_id=self.video, tf=self.teacher_forcing)
         self.device = device
         self.mean = mean
         self.var = var
@@ -60,8 +60,11 @@ class Trainer:
                         future = None
                         n_next = y_train.shape[1]
                         for k in range(n_next):
-                            pred, future = self.model(video=x_train, tgt=future, src=src_coord)
-
+                            if k == n_next - 1:
+                                pred, future = self.model(video=x_train, tgt=future, src=src_coord)
+                            else:
+                                with torch.no_grad():
+                                    pred, future = self.model(video=x_train, tgt=future, src=src_coord)
                     loss = self.criterion(pred, y_train)
 
                     train_loss.append(loss.item())
@@ -126,9 +129,9 @@ class Trainer:
 
                 x_test = test_batch["src"].to(self.device)
                 y_test = test_batch["tgt"].to(self.device)
-                y_test += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=y_test.shape).to(self.device)
+                #y_test += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=y_test.shape).to(self.device)
                 src_coord = test_batch["coords"].to(self.device)
-                #src_coord += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=src_coord.shape).to(self.device)
+                src_coord += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=src_coord.shape).to(self.device)
 
                 future = None
                 for k in range(y_test.shape[1]):
