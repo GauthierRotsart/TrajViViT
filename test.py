@@ -133,8 +133,8 @@ def main(cfg):
 		for img_bool, pos_bool in zip(img_bool_list, pos_bool_list):
 			model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
 							  dropout=dropout, n_prev=n_prev, pos_bool=pos_bool, img_bool=img_bool, device=device)
-			model_path = scene + "_" + video_id + "_"
-			model_path = get_model_name(model_path=model_path, img_bool=img_bool, pos_bool=pos_bool)
+			model_path = scene + "_" + video_id 
+			model_path = get_model_name(model_path=model_path, img_bool=img_bool, pos_bool=pos_bool, tf=teacher_forcing)
 			current_model_dict = model.state_dict()
 			loaded_state_dict = torch.load(saving_path + model_path, map_location=torch.device('cpu'))
 			new_state_dict = {k: v if v.size() == current_model_dict[k].size() else current_model_dict[k] for k, v in
