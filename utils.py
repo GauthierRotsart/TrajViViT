@@ -48,9 +48,14 @@ def get_run_name(multi_cam, box_size, pos_bool, img_bool, scene, video_id, tf):
 
 
 # Model name
-def get_model_name(model_path, img_bool, pos_bool, tf):
+def get_model_name(model_path, img_bool, pos_bool, tf, multi_cam=[]):
 	assert tf >= 0, "The teacher forcing argument has to be positive."
 	assert pos_bool is True or img_bool is True, "At least pos_bool or img_bool should be True."
+
+	if len(multi_cam) != 0:
+		model_path = ""
+		for sc in multi_cam:
+			model_path += sc
 
 	if tf != 100:
 		model_path += f"_tf_{tf}"
@@ -66,6 +71,7 @@ def get_model_name(model_path, img_bool, pos_bool, tf):
 
 
 def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video):
+	print(scene)
 	if len(multi_cam) == 0:
 		if box_size != 0:
 			data_folders = [
@@ -76,6 +82,7 @@ def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video
 			return data_folders
 	else:
 		folders = TrajDataset.conf_to_folders(multi_cam)
+
 		if box_size != 0:
 			data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"
 							for scenePath in folders]

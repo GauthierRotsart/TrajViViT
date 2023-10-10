@@ -32,7 +32,8 @@ class Trainer:
         self.saving_path = saving_path
         self.verbose = verbose
         self.name = get_run_name(multi_cam=self.multi_cam, box_size=self.box_size, pos_bool=self.pos_bool,
-                                 img_bool=self.img_bool, scene=self.scene, video_id=self.video, tf=self.teacher_forcing)
+                                 img_bool=self.img_bool, scene=self.scene, video_id=self.video, tf=self.teacher_forcing)\
+                    + '.pt'
         self.device = device
         self.mean = mean
         self.var = var

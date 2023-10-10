@@ -84,36 +84,30 @@ def main(cfg):
 		scene_test = scene
 		if cfg.video_test is None:
 			video_test_id = str(cfg.video)
-			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
 									   data_path=data_path, scene=scene, video=video)
 		else:
 			video_test_id = str(cfg.video_test)
-			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
 									   data_path=data_path, scene=scene, video=video_test)
 	else:
 		if cfg.video_test is None:
 			video_test_id = str(cfg.video)
-			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
 									   data_path=data_path, scene=scene_test, video=video)
 		else:
 			video_test_id = str(cfg.video_test)
-			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
 									   data_path=data_path, scene=scene_test, video=video_test)
 
-	train_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=0,
-							 box_size=box_size, verbose=verbose)
-	val_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=1,
-						   box_size=box_size, verbose=verbose)
 	test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
 							box_size=box_size, verbose=verbose)
 
 	if verbose:
-		print("TRAIN", len(train_data))
-		print("VAL", len(val_data))
+		#print("TRAIN", len(train_data))
+		#print("VAL", len(val_data))
 		print("TEST", len(test_data))
 
-	train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
-	val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True)
 	test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
 	video_list = [cfg.video]
@@ -133,8 +127,14 @@ def main(cfg):
 		for img_bool, pos_bool in zip(img_bool_list, pos_bool_list):
 			model = TrajViVit(dim=model_dimension, depth=model_depth, mlp_dim=mlp_dim, heads=n_heads, channels=1,
 							  dropout=dropout, n_prev=n_prev, pos_bool=pos_bool, img_bool=img_bool, device=device)
-			model_path = scene + "_" + video_id 
-			model_path = get_model_name(model_path=model_path, img_bool=img_bool, pos_bool=pos_bool, tf=teacher_forcing)
+			model_path = scene + "_" + video_id
+			model_path = get_model_name(model_path=model_path, img_bool=img_bool, pos_bool=pos_bool, tf=teacher_forcing,
+										multi_cam=multi_cam)
+			if len(multi_cam) > 0:
+				scene = ""
+				for sc in multi_cam:
+					scene += sc
+				video_id = "all"
 			current_model_dict = model.state_dict()
 			loaded_state_dict = torch.load(saving_path + model_path, map_location=torch.device('cpu'))
 			new_state_dict = {k: v if v.size() == current_model_dict[k].size() else current_model_dict[k] for k, v in
@@ -145,8 +145,8 @@ def main(cfg):
 
 			configuration = {
 				"model": model,
-				"train_data": train_loader,
-				"val_data": val_loader,
+				"train_data": None,
+				"val_data": None,
 				"test_data": test_loader,
 				"criterion": criterion,
 				"optimizer": None,
@@ -183,7 +183,8 @@ def main(cfg):
 						mse(error_x, error_y, 9), mse(error_x, error_y, 10), mse(error_x, error_y, 11)]
 			ade_data = ade(data_mse=data_mse)
 			fde_data = fde(mse_final=data_mse[-1])
-
+			#print("ADE:", ade_data)
+			#print("FDE:", fde_data)
 			if img_bool is True:
 				if pos_bool is True:
 					mode = "Img-Pos"
