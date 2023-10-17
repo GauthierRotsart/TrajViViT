@@ -48,7 +48,7 @@ def get_run_name(multi_cam, box_size, pos_bool, img_bool, scene, video_id, tf):
 
 
 # Model name
-def get_model_name(model_path, img_bool, pos_bool, tf, multi_cam=[]):
+def get_model_name(model_path, img_bool, pos_bool, tf, multi_cam):
 	assert tf >= 0, "The teacher forcing argument has to be positive."
 	assert pos_bool is True or img_bool is True, "At least pos_bool or img_bool should be True."
 
@@ -71,7 +71,6 @@ def get_model_name(model_path, img_bool, pos_bool, tf, multi_cam=[]):
 
 
 def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video):
-	print(scene)
 	if len(multi_cam) == 0:
 		if box_size != 0:
 			data_folders = [
