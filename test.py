@@ -3,6 +3,7 @@ import numpy as np
 import hydra
 import pandas as pd
 import os
+import random
 
 from train import Trainer
 from torch.nn import MSELoss
@@ -67,33 +68,50 @@ def main(cfg):
 	batch_size = cfg.model.params.batch_size
 	criterion = MSELoss()
 
-	if scene_test is None:  # inference on the source domain
+	seed = cfg.seed
+	random.seed(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed)
+
+	if cfg.test_prop == 0.05:
 		train_prop = 0.9
 		val_prop = 0.05
 		test_prop = 0.05
-		scene_test = scene
-		if cfg.video_test is None:
-			video_test_id = str(cfg.video)
-			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
-									   data_path=data_path, scene=scene, video=video)
-		else:
-			video_test_id = str(cfg.video_test)
-			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
-									   data_path=data_path, scene=scene, video=video_test)
-	else:  # inference on the target domain
+	else:
 		train_prop = 0
 		val_prop = 0
 		test_prop = 1
-		pos_bool = False
-		img_bool = True
+
+	if scene_test is None:  # inference on the source domain
+		if len(multi_cam) > 0:
+			scene = ""
+			for sc in multi_cam:
+				scene += sc
+		scene_test = scene
+		if cfg.video_test is None:
+			video_test_id = str(cfg.video)
+			if len(multi_cam) > 0:
+				video_test_id = "all"
+			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+									   data_path=data_path, scene=scene, video=video)
+		else:
+			video_test_id = str(cfg.video_test)
+			data_folders = get_folders(multi_cam=multi_cam, box_size=box_size, img_size=img_size, img_step=img_step,
+									   data_path=data_path, scene=scene, video=video_test)
+	else:  # inference on the target domain
 		if cfg.video_test is None:
 			video_test_id = str(cfg.video)
 			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
-									   data_path=data_path, scene=scene_test, video=video)
+									   data_path=data_path, scene=scene_test, video=video, source=False)
 		else:
 			video_test_id = str(cfg.video_test)
 			data_folders = get_folders(multi_cam=[], box_size=box_size, img_size=img_size, img_step=img_step,
-									   data_path=data_path, scene=scene_test, video=video_test)
+									   data_path=data_path, scene=scene_test, video=video_test, source=False)
+		scene_name = ""
+		for sc in scene_test:
+			scene_name += sc
+		scene_test = scene_name
 
 	assert pos_bool is True or img_bool is True, "At least pos_bool or img_bool should be True."
 	assert (train_prop == 0.9 and val_prop == 0.05 and test_prop == 0.05) or (
@@ -102,7 +120,7 @@ def main(cfg):
 	# if the inference is on the target domain, then the test set contains all the trajectories
 	props = [train_prop, val_prop, test_prop]
 	test_data = TrajDataset(data_folders, n_prev=n_prev, n_next=n_next, img_step=img_step, prop=props, part=2,
-							box_size=box_size, verbose=verbose)
+							box_size=box_size, verbose=verbose, mean=mean, var=var)
 
 	test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=True)
 
@@ -182,7 +200,7 @@ def main(cfg):
 		 + data_mse + [ade_data, fde_data]],
 		columns=["Source dataset", "Source domain", "Target dataset", "Target domain",
 				 "Mode", "Mean", "Variance"] + header_error_x + header_error_y + header_mse + ["ADE", "FDE"])
-	if test_prop == 0.05:
+	if cfg.scene_test is None:
 		saving_path += "source/"
 	else:
 		saving_path += "target/"

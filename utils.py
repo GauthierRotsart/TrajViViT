@@ -70,26 +70,26 @@ def get_model_name(model_path, img_bool, pos_bool, tf, multi_cam):
 	return f"{model_path}_{mode}.pt"
 
 
-def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video):
-	if len(multi_cam) == 0:
-		if box_size != 0:
-			data_folders = [
-				data_path + scene + video + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"]
-			return data_folders
+def get_folders(multi_cam, box_size, img_size, img_step, data_path, scene, video, source=True):
+	if source:
+		if len(multi_cam) == 0:
+			folders = TrajDataset.conf_to_folders([list(scene)[0] + list(video)[-1]])
 		else:
-			data_folders = [data_path + scene + video + f"/frames_({img_size}, {img_size})_step_{img_step}/"]
-			return data_folders
+			folders = TrajDataset.conf_to_folders(multi_cam)
 	else:
-		folders = TrajDataset.conf_to_folders(multi_cam)
+		folders = TrajDataset.conf_to_folders(scene)
 
-		if box_size != 0:
-			data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"
-							for scenePath in folders]
-			return data_folders
-		else:
-			data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_step_{img_step}/" for scenePath
-							in folders]
-			return data_folders
+	if box_size != 0:
+		data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_box_{box_size}_step_{img_step}/"
+						for scenePath in folders]
+		return data_folders
+	else:
+		data_folders = [data_path + scenePath + f"/frames_({img_size}, {img_size})_step_{img_step}/" for scenePath
+						in folders]
+		return data_folders
+
+
+
 
 
 

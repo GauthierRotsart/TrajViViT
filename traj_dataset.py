@@ -12,7 +12,7 @@ from PIL import Image
 class TrajDataset(dataset.Dataset):
     to_tensor = transforms.ToTensor()
 
-    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part, box_size, verbose):
+    def __init__(self, data_folders, n_prev, n_next, img_step, prop, part, box_size, verbose, mean=0, var=0):
 
         self.data_folders = data_folders
         self.n_prev = n_prev
@@ -20,6 +20,8 @@ class TrajDataset(dataset.Dataset):
         self.img_step = img_step
         self.box_size = box_size
         self.verbose = verbose
+        self.mean = mean
+        self.var = var
         if self.box_size == 0:
             self.block_size = "Variable"
         else:
@@ -76,9 +78,9 @@ class TrajDataset(dataset.Dataset):
         c = traj.iloc[pos: pos + self.n_prev][["x", "y"]]  # coordinates of the previous images
         y = traj.iloc[pos + self.n_prev: pos + self.n_prev + self.n_next][
             ["x", "y"]]  # coordinates of the next images
-
         self.src = torch.cat(x)
-        self.coords = self.normalize_coords(Tensor(c.values))
+        self.coords = self.normalize_coords(Tensor(c.values) + torch.normal(mean=self.mean, std=np.sqrt(self.var),
+                                                                            size=Tensor(c.values).shape))
         self.tgt = self.normalize_coords(Tensor(y.values))
 
         return {

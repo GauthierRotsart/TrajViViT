@@ -130,9 +130,7 @@ class Trainer:
 
                 x_test = test_batch["src"].to(self.device)
                 y_test = test_batch["tgt"].to(self.device)
-                #y_test += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=y_test.shape).to(self.device)
                 src_coord = test_batch["coords"].to(self.device)
-                src_coord += torch.normal(mean=self.mean, std=np.sqrt(self.var), size=src_coord.shape).to(self.device)
 
                 future = None
                 for k in range(y_test.shape[1]):

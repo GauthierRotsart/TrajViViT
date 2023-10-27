@@ -28,6 +28,7 @@ data_path: "/waldo/walban/student_datasets/arfranck/SDD/scenes/"
 saving_path: "/linux/grotsartdehe/"
 mean: 0
 var: 0
+test_prop: 0.05
 
 
 
